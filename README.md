@@ -5,12 +5,13 @@ LLM Protector is a Python library designed to secure calls to the OpenAI API by 
 ## Installation
 
 ```
-pip install resk ##soon avalailble  
+pip install resk ##soon available  
 ```
 Instead use : 
 ```
-git clone  
+git clone https://github.com/yourusername/llm-protector.git
 ```
+
 ## Usage
 
 ```python
@@ -104,8 +105,6 @@ The protector:
 
 The protector automatically sanitizes all inputs and manages the context when using the `protect_openai_call` method. Always use this method for your OpenAI API calls to benefit from all protections.
 
-```
-
 ## License
 
 This project is licensed under a Custom Open Source License. See the [LICENSE](LICENSE) file for full details. Key points:
@@ -114,3 +113,6 @@ This project is licensed under a Custom Open Source License. See the [LICENSE](L
 - Modifications must be documented and attributed
 - Paid versions based on this code are subject to royalties
 - The original source must be cited in all derivative works
+```
+
+This format is more suitable for a GitHub README.md file. It includes all the necessary sections such as Installation, Usage, Features, and License. The code blocks are properly formatted using markdown syntax, and the structure is clear and easy to read.
