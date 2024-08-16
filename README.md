@@ -1,6 +1,3 @@
-Here's the reformatted version as a GitHub README.md:
-
-```markdown
 # LLM Protector for OpenAI
 
 LLM Protector is a Python library designed to secure calls to the OpenAI API by protecting against context overflow attacks, cleaning inputs, and managing a sliding context window.
