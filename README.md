@@ -5,7 +5,7 @@ LLM Protector is a Python library designed to secure calls to the OpenAI API by 
 ## Installation
 
 ```
-pip install resk ##soon available  
+pip install resk-llm
 ```
 Instead use : 
 ```
