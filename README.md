@@ -51,29 +51,85 @@ These managers allow maintaining coherent conversations while respecting the con
 
 The `TextCleaner` class provides utility methods for cleaning and truncating text, ensuring that inputs are well-formatted and respect length limits.
 
+Certainly! I'll update the README with the new code and elements you've provided. Here's the revised version of the Usage and Features sections:
+
 ## Usage
 
-Here's a simple example of using the library:
-
 ```python
-from resk_llm import OpenAIProtector, TokenBasedContextManager
+from openai import OpenAI
+from llm_protector import OpenAIProtector
 
-# Initializing the protector
-protector = OpenAIProtector(model="gpt-4", context_manager=TokenBasedContextManager(RESK_MODELS["gpt-4"]))
+# Initialize the OpenAI client
+client = OpenAI(api_key="your-api-key")
 
-# OpenAI API function (to be replaced with the actual function)
-def openai_chat_completion(messages, model):
-    # Simulating an OpenAI API call
-    return {"choices": [{"message": {"content": "API response"}}]}
+# Create a protector instance
+protector = OpenAIProtector(model="gpt-4o-mini", preserved_prompts=2, reserved_tokens=1000)
 
-# Secure use of the API
+# Example usage with OpenAI API
 messages = [
     {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "Hello, how are you?"}
+    {"role": "user", "content": "Hello, can you help me?"},
+    {"role": "assistant", "content": "Of course! How can I assist you today?"},
+    {"role": "user", "content": "I'd like to learn more about Python programming."}
 ]
 
-response = protector.protect_openai_call(openai_chat_completion, messages=messages)
-print(response)
+response = protector.protect_openai_call(
+    client.chat.completions.create,
+    model="gpt-4o-mini",
+    messages=messages
+)
+
+print(response.choices[0].message.content)
+```
+
+## Features
+
+### Model Selection
+
+You can specify the model when initializing the protector:
+
+```python
+protector = OpenAIProtector(model="gpt-4o-mini")
+```
+
+To get the list of available models:
+
+```python
+print(OpenAIProtector.get_available_models())
+```
+
+To get information about a specific model:
+
+```python
+print(OpenAIProtector.get_model_info("gpt-4o-mini"))
+```
+
+#### Special Tokens
+
+The protector uses a predefined list of OpenAI special tokens for input sanitization. You can view and modify this list if necessary.
+
+To get the current list of special tokens:
+
+```python
+print(OpenAIProtector.get_special_tokens())
+```
+
+To update the list of special tokens:
+
+```python
+new_tokens = {
+    "general": ["<|endoftext|>", "<|fim_prefix|>"],
+    "chat": ["<|im_start|>user", "<|im_start|>assistant"]
+}
+OpenAIProtector.update_special_tokens(new_tokens)
+```
+
+### Context Management
+
+The protector automatically manages a sliding context for long conversations. You can specify the number of prompts to preserve and the number of reserved tokens during initialization:
+
+```python
+protector = OpenAIProtector(model="gpt-4o-mini", preserved_prompts=2, reserved_tokens=1000)
 ```
 
 ## API Reference
