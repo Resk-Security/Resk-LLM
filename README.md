@@ -9,7 +9,7 @@ pip install resk-llm
 ```
 Instead use : 
 ```
-git clone https://github.com/yourusername/llm-protector.git](https://github.com/Resk-Security/Resk-LLM)
+git clone https://github.com/Resk-Security/Resk-LLM
 ```
 
 ## Usage
