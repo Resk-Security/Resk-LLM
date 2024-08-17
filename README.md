@@ -57,15 +57,16 @@ Certainly! I'll update the README with the new code and elements you've provided
 
 ```python
 from openai import OpenAI
-from llm_protector import OpenAIProtector
+from resk_llm import OpenAIProtector
+from resk_llm.resk_context_manager import TokenBasedContextManager
+from resk_llm.resk_models import RESK_MODELS
 
 # Initialize the OpenAI client
-client = OpenAI(api_key="your-api-key")
+client = OpenAI(api_key="API_KEY")
+model = "gpt-4o"
+# Initializing the protector
+protector = OpenAIProtector(model=model, context_manager=TokenBasedContextManager(RESK_MODELS[model]))
 
-# Create a protector instance
-protector = OpenAIProtector(model="gpt-4o-mini", preserved_prompts=2, reserved_tokens=1000)
-
-# Example usage with OpenAI API
 messages = [
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": "Hello, can you help me?"},
@@ -75,7 +76,7 @@ messages = [
 
 response = protector.protect_openai_call(
     client.chat.completions.create,
-    model="gpt-4o-mini",
+    model = model,
     messages=messages
 )
 

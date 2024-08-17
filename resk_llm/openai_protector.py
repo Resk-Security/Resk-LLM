@@ -32,14 +32,12 @@ class OpenAIProtector:
         
         return text
 
-    def protect_openai_call(self, api_function: Callable, *args: Any, **kwargs: Any) -> Any:
+    def protect_openai_call(self, api_function: Callable, messages: List[str], *args: Any, **kwargs: Any) -> Any:
         sanitized_args = [self.sanitize_input(arg) if isinstance(arg, str) else arg for arg in args]
         sanitized_kwargs = {k: self.sanitize_input(v) if isinstance(v, str) else v for k, v in kwargs.items()}
         
-        if 'messages' in sanitized_kwargs:
-            sanitized_kwargs['messages'] = self.context_manager.manage_sliding_context(sanitized_kwargs['messages'])
+        sanitized_kwargs['messages'] = self.context_manager.manage_sliding_context(messages)
         
-        sanitized_kwargs['model'] = self.model_info.get('version', self.model)
         
         return api_function(*sanitized_args, **sanitized_kwargs)
     
