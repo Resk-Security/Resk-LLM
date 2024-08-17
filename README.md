@@ -9,7 +9,7 @@ pip install resk-llm
 ```
 Instead use : 
 ```
-git clone https://github.com/yourusername/llm-protector.git
+git clone https://github.com/Resk-Security/Resk-LLM
 ```
 
 ## Usage
@@ -115,4 +115,3 @@ This project is licensed under a Custom Open Source License. See the [LICENSE](L
 - The original source must be cited in all derivative works
 ```
 
-This format is more suitable for a GitHub README.md file. It includes all the necessary sections such as Installation, Usage, Features, and License. The code blocks are properly formatted using markdown syntax, and the structure is clear and easy to read.
