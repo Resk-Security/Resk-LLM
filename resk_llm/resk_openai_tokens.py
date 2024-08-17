@@ -16,7 +16,8 @@ OPENAI_SPECIAL_TOKENS = {
         "SYS",
         "[INST]",
         "<endoftext>",
-        "</endoftext>"
+        "</endoftext>",
+        "<|end|>"
         
 
     ],

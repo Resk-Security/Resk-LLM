@@ -1,72 +1,48 @@
 import re
 import html
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Union
 
 from resk_llm.resk_models import RESK_MODELS
 from resk_llm.resk_openai_tokens import OPENAI_SPECIAL_TOKENS
+from resk_llm.resk_control_chars import RESK_CONTROL_CHARS
+
+from resk_llm.resk_context_manager import MessageBasedContextManager, TokenBasedContextManager, TextCleaner
+
 
 class OpenAIProtector:
-    def __init__(self, model: str = "gpt-4o", max_context_length: int = None, reserved_tokens: int = 1000, preserved_prompts: int = 2):
+    def __init__(self, model: str = "gpt-4o", context_manager: Union[TokenBasedContextManager, MessageBasedContextManager] = None):
         self.model = model
         self.model_info = RESK_MODELS.get(model, RESK_MODELS["gpt-4o"])
-        self.max_context_length = max_context_length or self.model_info["context_window"]
-        self.max_output_tokens = self.model_info["max_output_tokens"]
-        self.reserved_tokens = reserved_tokens
-        self.preserved_prompts = preserved_prompts
         self.special_tokens = set(OPENAI_SPECIAL_TOKENS["general"] + OPENAI_SPECIAL_TOKENS["chat"])
+        self.context_manager = context_manager or TokenBasedContextManager(self.model_info)
 
     def sanitize_input(self, text: str) -> str:
+        # Nettoyer le texte
+        text = self.context_manager.clean_message(text)
+        
+        # Supprimer les tokens spéciaux
         for token in self.special_tokens:
             text = text.replace(token, "")
+        
+        # Encoder en UTF-8
         text = text.encode('utf-8', errors='ignore').decode('utf-8')
-        text = self._close_html_tags(text)
-        return html.escape(text, quote=False)  # Ne convertit pas les apostrophes
-
-    def _close_html_tags(self, text: str) -> str:
-        opened_tags = []
-        for match in re.finditer(r'<(\w+)[^>]*>', text):
-            tag = match.group(1)
-            if tag.lower() not in ['br', 'hr', 'img']:
-                opened_tags.append(tag)
-        for tag in reversed(opened_tags):
-            text += f'</{tag}>'
+        
+        # Échapper les caractères HTML
+        text = html.escape(text, quote=False)
+        
         return text
-
-    def _truncate_text(self, text: str) -> str:
-        max_chars = self.max_context_length * 4  # Estimation grossière : 1 token ≈ 4 caractères
-        return text[:max_chars] if len(text) > max_chars else text
-
-    def manage_sliding_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        # Séparer les prompts préservés et les messages restants
-        preserved_messages = messages[:self.preserved_prompts]
-        remaining_messages = messages[self.preserved_prompts:]
-
-        # Calculer les tokens disponibles
-        preserved_tokens = sum(len(msg['content'].split()) for msg in preserved_messages)
-        available_tokens = self.max_context_length - self.reserved_tokens - preserved_tokens
-
-        # Garder autant de messages récents que possible sans dépasser la limite
-        managed_messages = []
-        for msg in reversed(remaining_messages):
-            msg_tokens = len(msg['content'].split())
-            if available_tokens - msg_tokens >= 0:
-                managed_messages.insert(0, msg)
-                available_tokens -= msg_tokens
-            else:
-                break
-
-        return preserved_messages + managed_messages
 
     def protect_openai_call(self, api_function: Callable, *args: Any, **kwargs: Any) -> Any:
         sanitized_args = [self.sanitize_input(arg) if isinstance(arg, str) else arg for arg in args]
         sanitized_kwargs = {k: self.sanitize_input(v) if isinstance(v, str) else v for k, v in kwargs.items()}
         
         if 'messages' in sanitized_kwargs:
-            sanitized_kwargs['messages'] = self.manage_sliding_context(sanitized_kwargs['messages'])
+            sanitized_kwargs['messages'] = self.context_manager.manage_sliding_context(sanitized_kwargs['messages'])
         
         sanitized_kwargs['model'] = self.model_info.get('version', self.model)
         
         return api_function(*sanitized_args, **sanitized_kwargs)
+    
 
     @classmethod
     def get_available_models(cls) -> List[str]:
@@ -84,3 +60,12 @@ class OpenAIProtector:
     def update_special_tokens(cls, new_tokens: Dict[str, List[str]]) -> None:
         global OPENAI_SPECIAL_TOKENS
         OPENAI_SPECIAL_TOKENS = new_tokens
+
+    @classmethod
+    def get_control_chars(cls) -> Dict[str, str]:
+        return RESK_CONTROL_CHARS
+
+    @classmethod
+    def update_control_chars(cls, new_chars: Dict[str, str]) -> None:
+        global RESK_CONTROL_CHARS
+        RESK_CONTROL_CHARS = new_chars
