@@ -3,7 +3,7 @@ name: Python Package
 on: [push]
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     
     steps:
@@ -19,7 +19,7 @@ jobs:
     - name: Install package and test dependencies
       run: |
         pip install -e .
-        pip install pytest flake8
+        pip install pytest flake8 build twine
     - name: List directory contents
       run: |
         pwd
@@ -31,3 +31,12 @@ jobs:
     - name: Test with pytest
       run: |
         pytest -v
+    - name: Build package
+      run: python -m build
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        twine check dist/*
+        twine upload dist/*
