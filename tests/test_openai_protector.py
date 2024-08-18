@@ -84,7 +84,7 @@ class TestOpenAIProtector(unittest.TestCase):
         self.assertEqual(response.choices[0].message["content"], "Test response")
         mock_create.assert_called_once()
         called_args = mock_create.call_args[1]
-        self.assertEqual(called_args['model'], "gpt-4o-2024-05-13")  # Le nom du modèle est modifié dans le protecteur
+        self.assertEqual(called_args['model'], "gpt-4o")  # Le nom du modèle est modifié dans le protecteur
         self.assertEqual(len(called_args['messages']), 2)
         #self.assertNotIn("<s>", called_args['messages'][1]['content'])
 
