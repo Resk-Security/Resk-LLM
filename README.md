@@ -8,6 +8,7 @@
    - [OpenAIProtector](#openaiprotector)
    - [Context Managers](#context-managers)
    - [Text Cleaner](#text-cleaner)
+   - [ReskWordsLists](#reskwordslists)
 4. [Usage](#usage)
 5. [API Reference](#api-reference)
 6. [Configuration](#configuration)
@@ -52,6 +53,10 @@ These managers allow maintaining coherent conversations while respecting the con
 The `TextCleaner` class provides utility methods for cleaning and truncating text, ensuring that inputs are well-formatted and respect length limits.
 
 Certainly! I'll update the README with the new code and elements you've provided. Here's the revised version of the Usage and Features sections:
+
+### ReskWordsLists
+
+The ReskWordsLists class manages lists of prohibited words and patterns. It provides methods to check input against these lists and to add or remove items from the lists.
 
 ## Usage
 
@@ -133,6 +138,21 @@ The protector automatically manages a sliding context for long conversations. Yo
 protector = OpenAIProtector(model="gpt-4o-mini", preserved_prompts=2, reserved_tokens=1000)
 ```
 
+## Prohibited Words and Patterns
+
+The ReskWordsLists class manages prohibited words and patterns:
+```python
+protector.update_prohibited_list("badword", "add", "word")
+protector.update_prohibited_list(r"\b(ignore)\s+(system)\b", "add", "pattern")
+## You can also perform batch updates:
+pythonCopyupdates = [
+    {"item": "badword1", "action": "add", "item_type": "word"},
+    {"item": "badword2", "action": "remove", "item_type": "word"},
+    {"item": r"\b(avoid)\s+(rules)\b", "action": "add", "item_type": "pattern"}
+]
+protector.batch_update(updates)
+```
+
 ## API Reference
 
 ### OpenAIProtector
@@ -158,6 +178,15 @@ protector = OpenAIProtector(model="gpt-4o-mini", preserved_prompts=2, reserved_t
 - `clean_text(text: str) -> str`
 - `truncate_text(text: str, max_length: int) -> str`
 
+### ReskWordsLists
+
+- `__init__(self)`
+- `check_input(self, text: str) -> Union[str, None]`
+- `add_prohibited_word(self, word: str) -> None`
+- `add_prohibited_pattern(self, pattern: str) -> None`
+- `remove_prohibited_word(self, word: str) -> None`
+- `remove_prohibited_pattern(self, pattern: str) -> None`
+
 ## Configuration
 
 The library uses several constants and configurations defined in separate modules:
@@ -176,6 +205,8 @@ Security is a priority in this library. It implements several measures:
 - Removal of potentially dangerous special tokens
 - UTF-8 encoding and HTML escaping
 - Secure management of conversation context
+- Filtering of prohibited words and patterns
+
 
 ## Contributing
 
