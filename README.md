@@ -1,5 +1,6 @@
-
 # RESK LLM Library
+![image](https://github.com/user-attachments/assets/bf1c4aad-6966-414a-9317-277d0de3c6dd)
+
 
 ## Table of Contents
 1. [Introduction](#introduction)
