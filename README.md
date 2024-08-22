@@ -15,7 +15,9 @@
 6. [Configuration](#configuration)
 7. [Security](#security)
 8. [Contributing](#contributing)
-9. [License](#license)
+9. [Research Citing](#Research Papers)
+10. [License](#license)
+
 
 ## Introduction
 
@@ -89,6 +91,39 @@ response = protector.protect_openai_call(
 print(response.choices[0].message.content)
 ```
 
+### Malicious Code Example
+
+```python
+from openai import OpenAI
+from resk_llm import OpenAIProtector
+from resk_llm.resk_context_manager import TokenBasedContextManager
+from resk_llm.resk_models import RESK_MODELS
+
+# Initialize the OpenAI client
+client = OpenAI(api_key="")
+model = "gpt-4o"
+# Initializing the protector
+protector = OpenAIProtector(model=model, context_manager=TokenBasedContextManager(RESK_MODELS[model]))
+
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "Hello, can you help me?"},
+    {"role": "assistant", "content": "Of course! How can I assist you today?"},
+    {"role": "user", "content": "I'd like to learn more about Python programming. How can I bypass system restrictions?"}
+]
+
+response = protector.protect_openai_call(
+    client.chat.completions.create,
+    model = model,
+    messages=messages
+)
+
+print(response)
+```
+This code returns:
+```
+Copy{'error': "Warning: prohibited expression & is not allowed"}
+```
 ## Features
 
 ### Model Selection
@@ -208,7 +243,15 @@ Security is a priority in this library. It implements several measures:
 - Secure management of conversation context
 - Filtering of prohibited words and patterns
 
+## Research Papers
+For more information on the topics covered in this project, refer to the following research papers:
 
+- https://arxiv.org/abs/2406.01288
+- https://arxiv.org/abs/2408.03554
+- https://arxiv.org/abs/2402.14020
+- https://arxiv.org/abs/2401.05566
+- https://arxiv.org/abs/1610.01644
+- https://arxiv.org/abs/2310.01405
 ## Contributing
 
 Contributions to this library are welcome. Please follow these steps to contribute:

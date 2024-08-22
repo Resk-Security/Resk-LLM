@@ -3,13 +3,13 @@ import logging
 from typing import List, Dict, Union
 
 from resk_llm.prohibited_words import RESK_WORDS_LIST
-from resk_llm.prohibited_patterns import RESK_PROHIBITED_PATTERNS
+from resk_llm.prohibited_patterns_eng import RESK_PROHIBITED_PATTERNS_ENG
 
 class ReskWordsLists:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.prohibited_words = set(RESK_WORDS_LIST)
-        self.prohibited_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in RESK_PROHIBITED_PATTERNS]
+        self.prohibited_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in RESK_PROHIBITED_PATTERNS_ENG]
 
     def check_input(self, text: str) -> Union[str, None]:
         try:
