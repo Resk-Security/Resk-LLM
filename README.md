@@ -1,7 +1,6 @@
 # RESK LLM Library
 ![image](https://github.com/user-attachments/assets/bf1c4aad-6966-414a-9317-277d0de3c6dd)
 
-
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Installation](#installation)
@@ -10,14 +9,15 @@
    - [Context Managers](#context-managers)
    - [Text Cleaner](#text-cleaner)
    - [ReskWordsLists](#reskwordslists)
+   - [SecureTokenizer](#securetokenizer)
+   - [TokenizerProtector](#tokenizerprotector)
 4. [Usage](#usage)
 5. [API Reference](#api-reference)
 6. [Configuration](#configuration)
 7. [Security](#security)
 8. [Contributing](#contributing)
-9. [Research Citing](#Research Papers)
+9. [Research Citing](#research-papers)
 10. [License](#license)
-
 
 ## Introduction
 
@@ -55,11 +55,22 @@ These managers allow maintaining coherent conversations while respecting the con
 
 The `TextCleaner` class provides utility methods for cleaning and truncating text, ensuring that inputs are well-formatted and respect length limits.
 
-Certainly! I'll update the README with the new code and elements you've provided. Here's the revised version of the Usage and Features sections:
-
 ### ReskWordsLists
 
-The ReskWordsLists class manages lists of prohibited words and patterns. It provides methods to check input against these lists and to add or remove items from the lists.
+The `ReskWordsLists` class manages lists of prohibited words and patterns. It provides methods to check input against these lists and to add or remove items from the lists.
+
+### SecureTokenizer
+
+The `SecureTokenizer` class provides a secure way to tokenize text. It includes features such as:
+
+- Filtering out special tokens
+- Removing custom special tokens and control characters
+- Limiting the number of tokens
+- Cleaning text based on prohibited words and patterns
+
+### TokenizerProtector
+
+The `TokenizerProtector` class acts as a wrapper around the `SecureTokenizer`, providing an additional layer of protection and error handling when tokenizing text.
 
 ## Usage
 
@@ -122,8 +133,9 @@ print(response)
 ```
 This code returns:
 ```
-Copy{'error': "Warning: prohibited expression & is not allowed"}
+{'error': "Warning: prohibited expression & is not allowed"}
 ```
+
 ## Features
 
 ### Model Selection
@@ -181,7 +193,7 @@ The ReskWordsLists class manages prohibited words and patterns:
 protector.update_prohibited_list("badword", "add", "word")
 protector.update_prohibited_list(r"\b(ignore)\s+(system)\b", "add", "pattern")
 ## You can also perform batch updates:
-pythonCopyupdates = [
+updates = [
     {"item": "badword1", "action": "add", "item_type": "word"},
     {"item": "badword2", "action": "remove", "item_type": "word"},
     {"item": r"\b(avoid)\s+(rules)\b", "action": "add", "item_type": "pattern"}
@@ -223,6 +235,19 @@ protector.batch_update(updates)
 - `remove_prohibited_word(self, word: str) -> None`
 - `remove_prohibited_pattern(self, pattern: str) -> None`
 
+### SecureTokenizer
+
+- `__init__(self, tokenizer: PreTrainedTokenizer, max_tokens: int = 1024)`
+- `tokenize(self, text: str) -> Dict[str, Any]`
+- `_clean_text(self, text: str) -> str`
+- `_remove_custom_special_tokens(self, text: str) -> str`
+- `_remove_control_chars(self, text: str) -> str`
+
+### TokenizerProtector
+
+- `__init__(self, tokenizer: PreTrainedTokenizer)`
+- `__call__(self, text: str, **kwargs) -> str`
+
 ## Configuration
 
 The library uses several constants and configurations defined in separate modules:
@@ -230,8 +255,10 @@ The library uses several constants and configurations defined in separate module
 - `RESK_MODELS`: Information about supported models
 - `OPENAI_SPECIAL_TOKENS`: Special tokens to filter
 - `RESK_CONTROL_CHARS`: Control characters to manage
+- `RESK_WORDS_LIST`: List of prohibited words
+- `RESK_PROHIBITED_PATTERNS_ENG`: List of prohibited patterns in English
 
-These configurations can be dynamically updated using the class methods of `OpenAIProtector`.
+These configurations can be dynamically updated using the class methods of `OpenAIProtector` and `ReskWordsLists`.
 
 ## Security
 
@@ -242,6 +269,7 @@ Security is a priority in this library. It implements several measures:
 - UTF-8 encoding and HTML escaping
 - Secure management of conversation context
 - Filtering of prohibited words and patterns
+- Secure tokenization of text
 
 ## Research Papers
 For more information on the topics covered in this project, refer to the following research papers:
@@ -252,6 +280,7 @@ For more information on the topics covered in this project, refer to the followi
 - https://arxiv.org/abs/2401.05566
 - https://arxiv.org/abs/1610.01644
 - https://arxiv.org/abs/2310.01405
+
 ## Contributing
 
 Contributions to this library are welcome. Please follow these steps to contribute:

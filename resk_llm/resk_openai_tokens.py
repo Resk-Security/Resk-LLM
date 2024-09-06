@@ -17,7 +17,9 @@ OPENAI_SPECIAL_TOKENS = {
         "[INST]",
         "<endoftext>",
         "</endoftext>",
-        "<|end|>"
+        "<|end|>", 
+        "Human:",
+        "Assistant:"
         
 
     ],
