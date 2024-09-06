@@ -122,7 +122,7 @@ print(response)
 ```
 This code returns:
 ```
-Copy{'error': "Warning: prohibited expression & is not allowed"}
+{'error': "Warning: prohibited expression & is not allowed"}
 ```
 ## Features
 
@@ -181,7 +181,7 @@ The ReskWordsLists class manages prohibited words and patterns:
 protector.update_prohibited_list("badword", "add", "word")
 protector.update_prohibited_list(r"\b(ignore)\s+(system)\b", "add", "pattern")
 ## You can also perform batch updates:
-pythonCopyupdates = [
+updates = [
     {"item": "badword1", "action": "add", "item_type": "word"},
     {"item": "badword2", "action": "remove", "item_type": "word"},
     {"item": r"\b(avoid)\s+(rules)\b", "action": "add", "item_type": "pattern"}
