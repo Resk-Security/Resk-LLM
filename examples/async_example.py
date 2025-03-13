@@ -177,4 +177,8 @@ async def main():
 if __name__ == "__main__":
     # Point d'entrée pour l'exécution du script
     print("Démarrage du traitement asynchrone avec RESK-LLM...")
-    asyncio.run(main()) 
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"Erreur lors de l'exécution: {str(e)}")
+        print("Assurez-vous d'avoir configuré correctement votre clé API OpenAI dans les variables d'environnement.") 

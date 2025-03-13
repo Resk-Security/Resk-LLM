@@ -203,6 +203,34 @@ RESK-LLM is built on the latest security research in the field of LLM security:
 
 8. Zhan, X., et al. (2023). "Removing Harmful Content from Large Language Models." arXiv preprint arXiv:2402.04343. [Link](https://arxiv.org/abs/2402.04343)
 
+## Installation Options
+
+RESK-LLM provides several installation options to accommodate different use cases:
+
+### Basic Installation
+```bash
+pip install resk-llm
+```
+
+### Installation with CUDA Support
+For users who need GPU acceleration:
+```bash
+pip install resk-llm[cuda]
+```
+
+### CPU-only PyTorch Installation
+If you need PyTorch but don't want CUDA dependencies:
+```bash
+pip install torch==2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+pip install resk-llm
+```
+
+### Installation with All Optional Dependencies
+For users who want all features:
+```bash
+pip install resk-llm[all]
+```
+
 ## Contributing
 
 Contributions to RESK-LLM are welcome! Please feel free to submit a Pull Request.

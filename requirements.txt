@@ -5,7 +5,7 @@ cohere>=4.46.0
 
 # ML/AI Frameworks
 transformers>=4.44.2
-torch>=2.0.0
+# torch>=2.0.0  # Commented out as it requires CUDA which is causing issues
 numpy>=1.20.0
 
 # Web Frameworks
@@ -24,7 +24,7 @@ langchain>=0.1.0
 langchain-core>=0.1.0
 langchain-community>=0.1.0
 langchain-openai>=0.1.0
-langgraph>=0.3.8
+# langgraph>=0.3.8  # Removed as it's causing installation issues
 
 # Utility Libraries
 pydantic>=2.0.0
@@ -40,3 +40,6 @@ pillow>=9.0.0
 # tiktoken>=0.5.0  # For token counting with OpenAI models
 # sentence-transformers>=2.2.2  # For text embeddings
 # scikit-learn>=1.2.0  # For clustering and other ML tasks
+
+# CPU-only PyTorch (uncomment if you need PyTorch without CUDA)
+# torch==2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html

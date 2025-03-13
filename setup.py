@@ -35,8 +35,6 @@ setup(
         "langchain-core>=0.1.0",
         "langchain-community>=0.1.0",
         "langchain-openai>=0.1.0",
-        "langgraph>=0.3.8",
-        "torch>=2.0.0",
         "numpy>=1.20.0",
         "pillow>=9.0.0",
         "pydantic>=2.0.0",
@@ -48,5 +46,14 @@ setup(
         "pytest>=7.4.3",
         "pytest-asyncio>=0.23.5",
     ],
+    extras_require={
+        "cuda": ["torch>=2.0.0"],
+        "all": [
+            "torch>=2.0.0",
+            "tiktoken>=0.5.0",
+            "sentence-transformers>=2.2.2",
+            "scikit-learn>=1.2.0",
+        ],
+    },
     license=license_text,
 )
