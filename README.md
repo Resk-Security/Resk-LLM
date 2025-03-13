@@ -9,6 +9,9 @@
 [![Documentation Status](https://readthedocs.org/projects/resk-llm/badge/?version=latest)](https://resk-llm.readthedocs.io/en/latest/?badge=latest)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![GitHub last commit](https://img.shields.io/github/last-commit/Resk-Security/Resk-LLM)](https://github.com/Resk-Security/Resk-LLM/commits/main)
+[![PyPI - Implementation](https://img.shields.io/pypi/implementation/resk-llm)](https://pypi.org/project/resk-llm/)
+[![LLM Security](https://img.shields.io/badge/LLM-Security-red)](https://github.com/Resk-Security/Resk-LLM)
 
 RESK-LLM is a comprehensive security toolkit for Large Language Models (LLMs), designed to protect against prompt injections, data leakage, and malicious use. It provides robust security features for multiple LLM providers including OpenAI, Anthropic, Cohere, DeepSeek, and OpenRouter.
 

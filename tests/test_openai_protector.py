@@ -21,7 +21,13 @@ class TestOpenAIProtector(unittest.TestCase):
         # Initialisation d'un context manager séparé pour les tests qui en ont besoin
         self.context_manager = TokenBasedContextManager({"context_window": 4096}, preserved_prompts=2)
         
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        # Use a mock tokenizer instead of downloading from HuggingFace to avoid network dependencies
+        self.tokenizer = MagicMock()
+        self.tokenizer.encode.return_value = [101, 102, 103]  # Mock token IDs
+        self.tokenizer.decode.return_value = "decoded text"
+        self.tokenizer.get_vocab.return_value = {
+            "[PAD]": 0, "[UNK]": 100, "[CLS]": 101, "[SEP]": 102, "[MASK]": 103
+        }
         self.protectorTokenizer = TokenizerProtector(self.tokenizer)
 
 
