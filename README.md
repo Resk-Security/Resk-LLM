@@ -207,6 +207,3 @@ RESK-LLM is built on the latest security research in the field of LLM security:
 
 Contributions to RESK-LLM are welcome! Please feel free to submit a Pull Request.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
