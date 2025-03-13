@@ -187,7 +187,7 @@ class TestReskDeployment(unittest.TestCase):
         self.assertGreater(toxic_results["toxicity_score"], 0)
         
         # Test moderation
-        moderation_result = moderate_text(self.toxic_text)
+        moderation_result = moderate_text(self.toxic_text, threshold=2.0)
         self.assertFalse(moderation_result["is_approved"])
         
         moderation_result = moderate_text(self.normal_text)

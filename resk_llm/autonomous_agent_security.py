@@ -8,7 +8,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Union, Callable, Set, Tuple
 
-from resk_llm.openai_protector import OpenAIProtector
+from resk_llm.providers_integration import OpenAIProtector
 from resk_llm.resk_context_manager import TokenBasedContextManager
 
 # Configuration du logger
@@ -519,4 +519,230 @@ class SecureAvatar:
                 self.protector.update_prohibited_list(topic, "add", "word")
             elif action == "remove" and topic in self.banned_topics:
                 self.banned_topics.remove(topic)
-                self.protector.update_prohibited_list(topic, "remove", "word") 
+                self.protector.update_prohibited_list(topic, "remove", "word")
+
+
+class AgentSecurityManager:
+    """
+    Gestionnaire de sécurité pour agents autonomes.
+    Combine les fonctionnalités d'identité et de surveillance pour une sécurité complète.
+    """
+    
+    def __init__(self, model: str = "gpt-4o", rate_limit: int = 100):
+        """
+        Initialise le gestionnaire de sécurité pour agents.
+        
+        Args:
+            model: Le modèle LLM à utiliser pour l'analyse de sécurité
+            rate_limit: Limite de nombre d'actions par minute
+        """
+        self.identity_manager = AgentIdentityManager()
+        self.security_monitor = AgentSecurityMonitor(
+            identity_manager=self.identity_manager,
+            model=model,
+            rate_limit=rate_limit
+        )
+        self.sandboxes = {}
+        
+    def register_agent(self, name: str, role: str, permissions: List[str]) -> str:
+        """
+        Enregistre un nouvel agent.
+        
+        Args:
+            name: Nom de l'agent
+            role: Rôle de l'agent
+            permissions: Liste des permissions accordées
+            
+        Returns:
+            ID de l'agent créé
+        """
+        return self.identity_manager.register_agent(name, role, permissions)
+        
+    def create_sandbox(self, agent_id: str, allowed_resources: Optional[Set[str]] = None) -> Optional[AgentSandbox]:
+        """
+        Crée un environnement sandbox pour un agent.
+        
+        Args:
+            agent_id: ID de l'agent
+            allowed_resources: Ressources autorisées pour l'agent
+            
+        Returns:
+            Instance de sandbox ou None en cas d'échec
+        """
+        if not self.identity_manager.verify_agent(agent_id):
+            return None
+            
+        sandbox = AgentSandbox(
+            agent_id=agent_id,
+            security_monitor=self.security_monitor,
+            allowed_resources=allowed_resources
+        )
+        
+        self.sandboxes[agent_id] = sandbox
+        return sandbox
+        
+    def execute_action(self, agent_id: str, action: str, action_type: str, 
+                     resource: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Exécute une action pour un agent spécifique.
+        
+        Args:
+            agent_id: ID de l'agent
+            action: Action à exécuter
+            action_type: Type de l'action
+            resource: Ressource ciblée (optionnel)
+            
+        Returns:
+            Résultat de l'action
+        """
+        if agent_id not in self.sandboxes:
+            self.create_sandbox(agent_id)
+            
+        if agent_id in self.sandboxes:
+            return self.sandboxes[agent_id].execute_action(action, action_type, resource)
+        else:
+            return {
+                "status": "error",
+                "message": "Agent non autorisé"
+            }
+            
+    def revoke_agent(self, agent_id: str) -> bool:
+        """
+        Révoque un agent.
+        
+        Args:
+            agent_id: ID de l'agent à révoquer
+            
+        Returns:
+            True si la révocation a réussi, False sinon
+        """
+        if agent_id in self.sandboxes:
+            self.sandboxes[agent_id].close()
+            del self.sandboxes[agent_id]
+            
+        return self.identity_manager.revoke_agent(agent_id)
+        
+    def get_agent_info(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Obtient les informations sur un agent.
+        
+        Args:
+            agent_id: ID de l'agent
+            
+        Returns:
+            Informations sur l'agent ou None si non trouvé
+        """
+        return self.identity_manager.get_agent_info(agent_id)
+        
+    def get_agent_actions(self, agent_id: str, limit: int = 10) -> Optional[List[Dict[str, Any]]]:
+        """
+        Obtient l'historique des actions d'un agent.
+        
+        Args:
+            agent_id: ID de l'agent
+            limit: Nombre maximum d'actions à retourner
+            
+        Returns:
+            Liste des actions ou None si agent non trouvé
+        """
+        return self.identity_manager.get_agent_actions(agent_id, limit)
+
+
+class AgentPermission:
+    """
+    Types de permissions pour les agents.
+    """
+    # Permissions système
+    SYSTEM_ACCESS = "system:access"
+    FILE_READ = "file:read"
+    FILE_WRITE = "file:write"
+    NETWORK_ACCESS = "network:access"
+    
+    # Permissions d'API
+    API_READ = "api:read"
+    API_WRITE = "api:write"
+    
+    # Permissions de base de données
+    DB_READ = "db:read"
+    DB_WRITE = "db:write"
+    
+    # Permissions utilisateur
+    USER_INTERACT = "user:interact"
+    USER_DATA_ACCESS = "user:data:access"
+    
+    # Permissions avancées
+    ADMIN_ACCESS = "admin:access"
+    SECURITY_OVERRIDE = "security:override"
+
+
+class AgentIdentity:
+    """
+    Identité d'un agent.
+    """
+    def __init__(self, id: str, name: str, role: str, permissions: List[str]):
+        """
+        Initialise une identité d'agent.
+        
+        Args:
+            id: ID unique de l'agent
+            name: Nom de l'agent
+            role: Rôle de l'agent
+            permissions: Liste des permissions accordées
+        """
+        self.id = id
+        self.name = name
+        self.role = role
+        self.permissions = permissions
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convertit l'identité en dictionnaire.
+        
+        Returns:
+            Dictionnaire représentant l'identité
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "role": self.role,
+            "permissions": self.permissions
+        }
+
+
+class SecureAgentExecutor:
+    """
+    Exécuteur sécurisé pour agents autonomes.
+    """
+    def __init__(self, security_manager: AgentSecurityManager, agent_id: str):
+        """
+        Initialise l'exécuteur sécurisé.
+        
+        Args:
+            security_manager: Gestionnaire de sécurité
+            agent_id: ID de l'agent
+        """
+        self.security_manager = security_manager
+        self.agent_id = agent_id
+        
+    def execute(self, action: str, action_type: str, resource: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Exécute une action de manière sécurisée.
+        
+        Args:
+            action: Action à exécuter
+            action_type: Type de l'action
+            resource: Ressource ciblée (optionnel)
+            
+        Returns:
+            Résultat de l'action
+        """
+        return self.security_manager.execute_action(self.agent_id, action, action_type, resource)
+
+
+# Permissions par défaut pour les agents
+AGENT_DEFAULT_PERMISSIONS = [
+    AgentPermission.SYSTEM_ACCESS,
+    AgentPermission.FILE_READ,
+    AgentPermission.API_READ,
+    AgentPermission.USER_INTERACT
+] 

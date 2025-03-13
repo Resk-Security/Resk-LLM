@@ -549,3 +549,131 @@ class ReskProtectorTokenizer:
         text = self.tokenizer.decode(filtered_ids, **kwargs)
         
         return text
+
+
+class TokenizerProtector:
+    """
+    Wrapper autour de ReskProtectorTokenizer pour la compatibilité avec le code existant.
+    Cette classe protège un tokenizer Hugging Face contre les tentatives d'injection et le contenu malveillant.
+    """
+    
+    def __init__(self, tokenizer: PreTrainedTokenizer, custom_patterns_path: Optional[str] = None):
+        """
+        Initialise le protecteur de tokenizer.
+        
+        Args:
+            tokenizer: Le tokenizer Hugging Face à protéger
+            custom_patterns_path: Chemin vers un fichier de patterns personnalisés (optionnel)
+        """
+        self.tokenizer = tokenizer
+        self.secure_tokenizer = ReskProtectorTokenizer(tokenizer, custom_patterns_path)
+        self.resk_words_lists = self.secure_tokenizer.checker
+        
+    def __call__(self, text: str, **kwargs) -> str:
+        """
+        Traite un texte avec le tokenizer sécurisé et renvoie le résultat au format JSON.
+        
+        Args:
+            text: Le texte à tokenizer
+            kwargs: Arguments supplémentaires à passer au tokenizer
+            
+        Returns:
+            Résultat au format JSON
+        """
+        try:
+            # Vérifier et protéger le texte
+            cleaned_text, is_modified, warning = self.secure_tokenizer.check_and_protect(text)
+            
+            if warning:
+                return json.dumps({
+                    "status": "warning",
+                    "message": warning,
+                    "is_modified": is_modified,
+                    "original_text": text,
+                    "modified_text": cleaned_text
+                })
+            
+            # Encoder le texte
+            result = self.secure_tokenizer.encode(cleaned_text, **kwargs)
+            
+            # Ajouter des méta-informations
+            result.update({
+                "status": "success",
+                "is_modified": is_modified,
+                "original_text": text
+            })
+            
+            if is_modified:
+                result["modified_text"] = cleaned_text
+                
+            return json.dumps(result)
+            
+        except Exception as e:
+            return json.dumps({
+                "status": "error",
+                "message": str(e),
+                "original_text": text
+            })
+            
+class SecureTokenizer:
+    """
+    Classe de compatibilité pour maintenir la rétrocompatibilité avec le code existant.
+    """
+    
+    def __init__(self, tokenizer: PreTrainedTokenizer, resk_words_lists: Optional[ReskWordsLists] = None):
+        """
+        Initialise le tokenizer sécurisé.
+        
+        Args:
+            tokenizer: Le tokenizer Hugging Face à sécuriser
+            resk_words_lists: Instance de ReskWordsLists (optionnel)
+        """
+        self.tokenizer = tokenizer
+        self.resk_words_lists = resk_words_lists or ReskWordsLists()
+        
+    def encode(self, text: str, **kwargs) -> Dict[str, Any]:
+        """
+        Encode un texte avec le tokenizer sécurisé.
+        
+        Args:
+            text: Le texte à encoder
+            kwargs: Arguments supplémentaires pour le tokenizer
+            
+        Returns:
+            Résultat de l'encodage
+        """
+        # Nettoyer le texte
+        cleaned_text, modifications = self.resk_words_lists.sanitize_input(text)
+        
+        # Encoder avec le tokenizer original
+        encoding = self.tokenizer(cleaned_text, **kwargs)
+        
+        # Convertir en dictionnaire si nécessaire
+        if not isinstance(encoding, dict):
+            encoding = {
+                "input_ids": encoding.input_ids,
+                "attention_mask": encoding.attention_mask
+            }
+            
+        # Ajouter les tokens
+        tokens = self.tokenizer.convert_ids_to_tokens(encoding["input_ids"])
+        
+        return {
+            "tokens": tokens,
+            "num_tokens": len(tokens),
+            "tokenizer_output": encoding,
+            "modifications": modifications
+        }
+        
+    def decode(self, token_ids: List[int], **kwargs) -> str:
+        """
+        Décode des token_ids vers du texte.
+        
+        Args:
+            token_ids: Les IDs de tokens à décoder
+            kwargs: Arguments supplémentaires pour le décodeur
+            
+        Returns:
+            Texte décodé
+        """
+        return self.tokenizer.decode(token_ids, **kwargs)
