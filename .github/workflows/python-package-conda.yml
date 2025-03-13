@@ -1,42 +1,77 @@
 name: Python Package
 
-on: [push]
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'  # Run workflow on version tags, e.g. v1.0.0
+  pull_request:
+    branches: [main]
 
 jobs:
-  build-and-publish:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10']
+    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+        pip install pytest flake8 mypy
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Type check with mypy
+      run: |
+        mypy --ignore-missing-imports resk_llm/
+    - name: Test with pytest
+      run: |
+        pytest -v
+
+  build-and-publish:
+    needs: test
+    runs-on: ubuntu-latest
+    # Only publish on tag push events
+    if: startsWith(github.ref, 'refs/tags/v')
     
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: '3.10'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: Install package and test dependencies
+        pip install build twine
+    - name: Run pre-release check
       run: |
-        pip install -e .
-        pip install pytest flake8 build twine
-    - name: List directory contents
-      run: |
-        pwd
-        ls -R
-    - name: Lint with flake8
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        pytest -v
+        python pre_release_check.py
     - name: Build package
-      run: python -m build
+      run: |
+        python -m build
+    - name: Verify package
+      run: |
+        twine check dist/*
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        twine check dist/*
         twine upload dist/*
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*
+        generate_release_notes: true

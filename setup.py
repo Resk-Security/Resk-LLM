@@ -8,7 +8,7 @@ with open("LICENCE.txt", "r", encoding="utf-8") as f:
 
 setup(
     name="resk-llm",
-    version="0.2.5",
+    version="0.3.0",
     author="Resk",
     author_email="nielzac@proton.me",
     description="Resk-LLM is a robust Python library designed to enhance security and manage context when interacting with OpenAI's language models. It provides a protective layer for API calls, safeguarding against common vulnerabilities and ensuring optimal performance.",
@@ -23,7 +23,22 @@ setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "openai",
+        "openai>=1.41.0",
+        "transformers>=4.44.2",
+        "flask>=2.0.0",
+        "langchain>=0.1.0",
+        "langchain-core>=0.1.0",
+        "langchain-community>=0.1.0",
+        "langchain-openai>=0.1.0",
+        "langgraph>=0.0.25",
+        "torch>=2.0.0",
+        "numpy>=1.20.0",
+        "pillow>=9.0.0",
+        "pydantic>=2.0.0",
+        "requests>=2.25.0",
+        "rich>=10.0.0",
+        "typing-extensions>=4.0.0",
+        "urllib3>=1.26.0",
     ],
     license=license_text,
 )
