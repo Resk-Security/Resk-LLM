@@ -53,12 +53,12 @@ class AgentSecurityConfig(BaseModel):
     permissions: List[str] = Field(default_factory=list)
     rate_limit: int = 60
     max_tokens: int = 8192
-    allowed_models: List[str] = Field(default_factory=list)
-    api_keys: List[str] = Field(default_factory=list)
+    allowed_models: List[str] = Field(default_factory=lambda: [])
+    api_keys: List[str] = Field(default_factory=lambda: [])
     is_active: bool = True
     temperature: Optional[float] = 0.7
-    prohibited_words: Optional[List[str]] = Field(default_factory=list)
-    prohibited_patterns: Optional[List[str]] = Field(default_factory=list)
+    prohibited_words: Optional[List[str]] = Field(default_factory=lambda: [])
+    prohibited_patterns: Optional[List[str]] = Field(default_factory=lambda: [])
     enable_pii_detection: Optional[bool] = True
     enable_moderation: Optional[bool] = True
     moderation_threshold: Optional[float] = 0.8
@@ -195,7 +195,7 @@ class FastAPIProtector:
             @app.middleware("http")
             async def sanitize_request_middleware(request: Request, call_next):
                 # Implement request sanitization before processing
-                sanitized_request = await self._sanitize_request(request)
+                sanitized_request = self._sanitize_request(request)
                 response = await call_next(sanitized_request)
                 return response
         
@@ -499,8 +499,8 @@ class PatternCreateRequest(BaseModel):
     """Request model for creating or updating custom patterns."""
     name: str = Field(..., description="Name of the pattern set")
     description: Optional[str] = Field(None, description="Description of the pattern set")
-    prohibited_words: List[str] = Field(default_factory=list, description="List of prohibited words")
-    prohibited_patterns: List[str] = Field(default_factory=list, description="List of regex patterns")
+    prohibited_words: List[str] = Field(default_factory=lambda: [], description="List of prohibited words")
+    prohibited_patterns: List[str] = Field(default_factory=lambda: [], description="List of regex patterns")
     is_active: bool = Field(True, description="Whether the pattern set is active")
 
 def create_resk_fastapi_app(
