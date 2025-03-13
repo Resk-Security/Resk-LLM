@@ -150,19 +150,23 @@ class OpenAIProtector(BaseProviderProtector):
             
         return text
     
-    def protect_openai_call(self, api_function: Callable, messages: List[Dict[str, str]], *args: Any, **kwargs: Any) -> Any:
+    def protect_openai_call(self, api_function: Callable, messages: List[Dict[str, str]], 
+                           chat_history: Optional[List[Dict[str, str]]] = None, **kwargs: Any) -> Any:
         """
         Protège un appel à l'API OpenAI.
         
         Args:
             api_function: Fonction API à appeler
             messages: Liste des messages à envoyer
-            args: Arguments positionnels supplémentaires
+            chat_history: Historique du chat (optionnel)
             kwargs: Arguments nommés supplémentaires
             
         Returns:
             Résultat de l'appel API
         """
+        if chat_history is None:
+            chat_history = []
+        
         try:
             # Désinfecter les messages si la désinfection est activée
             if self.request_sanitization:
@@ -210,7 +214,7 @@ class OpenAIProtector(BaseProviderProtector):
             kwargs['max_tokens'] = kwargs.get('max_tokens', self.max_tokens)
             
             # Appeler l'API
-            response = api_function(*args, **kwargs)
+            response = api_function(**kwargs)
             
             # Désinfecter la réponse si nécessaire
             if self.response_sanitization and hasattr(response, 'choices') and len(response.choices) > 0:
@@ -428,7 +432,7 @@ class CohereProtector(BaseProviderProtector):
             self.log_error("Erreur lors de l'appel à l'API Cohere", e)
             return {"error": "Une erreur s'est produite lors du traitement de votre demande."}
     
-    def protect_cohere_chat_call(self, api_function: Callable, message: str, chat_history: List[Dict[str, str]] = None, *args: Any, **kwargs: Any) -> Any:
+    def protect_cohere_chat_call(self, api_function: Callable, message: str, chat_history: Optional[List[Dict[str, str]]] = None, *args: Any, **kwargs: Any) -> Any:
         """
         Protège un appel à l'API Cohere Chat.
         

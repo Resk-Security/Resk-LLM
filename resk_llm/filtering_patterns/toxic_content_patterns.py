@@ -128,17 +128,8 @@ CONTEXTUAL_PATTERNS: Dict[str, Tuple[Pattern, Pattern]] = {
     )
 }
 
-def check_toxic_content(text: str) -> Dict[str, Any]:
-    """
-    Vérifie si un texte contient du contenu toxique.
-    
-    Args:
-        text: Le texte à vérifier
-        
-    Returns:
-        Un dictionnaire contenant les catégories toxiques détectées, des exemples et un score de toxicité
-    """
-    results = {
+def analyze_toxicity(text: str) -> Dict[str, Any]:
+    results: Dict[str, Any] = {
         "categories": {},
         "total_matches": 0,
         "toxicity_score": 0.0,
@@ -225,7 +216,7 @@ def moderate_text(text: str, threshold: float = 5.0) -> Dict[str, Any]:
     Returns:
         Un dictionnaire contenant le résultat de modération
     """
-    toxicity_check = check_toxic_content(text)
+    toxicity_check = analyze_toxicity(text)
     
     moderation_result = {
         "is_approved": toxicity_check["toxicity_score"] < threshold,
@@ -249,3 +240,17 @@ def moderate_text(text: str, threshold: float = 5.0) -> Dict[str, Any]:
             moderation_result["recommendation"] = "Contenu rejeté pour toxicité générale. Révision recommandée."
     
     return moderation_result 
+
+def check_toxic_content(text: str, threshold: float = 5.0) -> Dict[str, Any]:
+    """
+    Vérifie si un texte contient du contenu toxique.
+    
+    Args:
+        text: Le texte à vérifier
+        threshold: Le seuil de toxicité (0-10) à partir duquel le texte est considéré comme toxique
+        
+    Returns:
+        Un dictionnaire contenant les résultats de l'analyse de toxicité
+    """
+    moderation_result = moderate_text(text, threshold)
+    return moderation_result["detailed_analysis"] 

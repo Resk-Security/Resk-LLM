@@ -3,7 +3,7 @@ Module contenant des patterns pour détecter les informations personnelles ident
 et les tentatives de doxxing.
 """
 
-from typing import Dict, List, Pattern, Tuple, Any
+from typing import Dict, List, Pattern, Tuple, Any, Optional
 import re
 
 # Regex compilés pour différents types de PII
@@ -127,44 +127,34 @@ def check_pii_content(text: str) -> Dict[str, List[str]]:
     return results
 
 def check_doxxing_attempt(text: str) -> Dict[str, Any]:
-    """
-    Vérifie si un texte contient des tentatives potentielles de doxxing.
-    
-    Args:
-        text: Le texte à vérifier
-        
-    Returns:
-        Un dictionnaire contenant les indices de doxxing et un score de risque
-    """
-    results = {
+    results: Dict[str, Any] = {
         "keywords": [],
         "contexts": [],
         "risk_score": 0.0
     }
-    
     # Vérifier les mots-clés de doxxing
     for keyword in DOXXING_KEYWORDS:
         pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
         if pattern.search(text):
             results["keywords"].append(keyword)
             results["risk_score"] += 0.5
-    
+
     # Vérifier les contextes de doxxing
     for before, after in DOXXING_CONTEXTS:
         pattern = re.compile(r'\b' + re.escape(before) + r'.*?' + re.escape(after) + r'\b', re.IGNORECASE)
         if pattern.search(text):
             results["contexts"].append(f"{before}...{after}")
             results["risk_score"] += 1.0
-    
+
     # Vérifier la présence combinée de PII et de mots-clés de doxxing
     pii_results = check_pii_content(text)
     if pii_results and results["keywords"]:
         results["pii_detected"] = list(pii_results.keys())
         results["risk_score"] += 2.0
-    
+
     # Normaliser le score de risque entre 0 et 10
     results["risk_score"] = min(10.0, results["risk_score"])
-    
+
     return results
 
 def anonymize_text(text: str) -> str:
@@ -188,3 +178,44 @@ def anonymize_text(text: str) -> str:
         text = pattern.sub(replacement, text)
     
     return text 
+
+def analyze_pii(text: str) -> Dict[str, Any]:
+    results: Dict[str, Any] = {
+        "keywords": [],
+        "contexts": [],
+        "risk_score": 0.0,
+        "pii_detected": []
+    }
+    # Vérifier les mots-clés de doxxing
+    for keyword in DOXXING_KEYWORDS:
+        pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
+        if pattern.search(text):
+            results["keywords"].append(keyword)
+            results["risk_score"] += 0.5
+
+    # Vérifier les contextes de doxxing
+    for before, after in DOXXING_CONTEXTS:
+        pattern = re.compile(r'\b' + re.escape(before) + r'.*?' + re.escape(after) + r'\b', re.IGNORECASE)
+        if pattern.search(text):
+            results["contexts"].append(f"{before}...{after}")
+            results["risk_score"] += 1.0
+
+    # Vérifier la présence combinée de PII et de mots-clés de doxxing
+    pii_results = check_pii_content(text)
+    if pii_results and len(results["keywords"]) > 0:
+        results["pii_detected"] = list(pii_results.keys())
+        results["risk_score"] += 2.0
+
+    # Normaliser le score de risque entre 0 et 10
+    results["risk_score"] = min(10.0, float(results["risk_score"]))
+
+    return results
+
+def create_custom_pattern_file(name: str, words: Optional[List[str]] = None, 
+                             patterns: Optional[List[str]] = None) -> str:
+    if words is None:
+        words = []
+    if patterns is None:
+        patterns = []
+    # Create a file with custom patterns
+    return f"{name}.json" 

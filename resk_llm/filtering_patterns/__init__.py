@@ -47,8 +47,9 @@ from resk_llm.filtering_patterns.toxic_content_patterns import (
     SUBTLE_TOXICITY_PATTERNS,
     TOXICITY_KEYWORDS,
     CONTEXTUAL_PATTERNS,
-    check_toxic_content,
-    moderate_text
+    analyze_toxicity,
+    moderate_text,
+    check_toxic_content
 )
 
 # Import des protections contre les emojis et caractères spéciaux
@@ -114,8 +115,9 @@ __all__ = [
     'SUBTLE_TOXICITY_PATTERNS',
     'TOXICITY_KEYWORDS',
     'CONTEXTUAL_PATTERNS',
-    'check_toxic_content',
+    'analyze_toxicity',
     'moderate_text',
+    'check_toxic_content',
     
     # Protection emoji et obfuscation
     'EMOJI_PATTERN',

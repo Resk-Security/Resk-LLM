@@ -114,7 +114,7 @@ class FastAPIProtector:
                 patterns_api_prefix: str = "/api/patterns",
                 api_key_header: str = "X-API-Key",
                 agent_id_header: str = "X-Agent-ID",
-                cors_origins: List[str] = None,
+                cors_origins: Optional[List[str]] = None,
                 agent_security_enabled: bool = False,
                 agent_configs_file: Optional[str] = None):
         """
@@ -163,8 +163,8 @@ class FastAPIProtector:
         # Agent security
         self.agent_security_enabled = agent_security_enabled
         self.agent_configs_file = agent_configs_file
-        self.agent_configs = {}
-        self._rate_limiters = {}
+        self.agent_configs: Dict[str, AgentSecurityConfig] = {}
+        self._rate_limiters: Dict[str, Rate] = {}
         
         # Load agent configurations if enabled
         if agent_security_enabled and agent_configs_file:
@@ -501,4 +501,59 @@ class PatternCreateRequest(BaseModel):
     description: Optional[str] = Field(None, description="Description of the pattern set")
     prohibited_words: List[str] = Field(default_factory=list, description="List of prohibited words")
     prohibited_patterns: List[str] = Field(default_factory=list, description="List of regex patterns")
-    is_active: bool = Field(True, description="Whether the pattern set is active") 
+    is_active: bool = Field(True, description="Whether the pattern set is active")
+
+def create_resk_fastapi_app(
+    openai_api_key: Optional[str] = None,
+    anthropic_api_key: Optional[str] = None,
+    cohere_api_key: Optional[str] = None,
+    openrouter_api_key: Optional[str] = None,
+    deepseek_api_key: Optional[str] = None,
+    cors_origins: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None
+) -> FastAPI:
+    """
+    Creates a FastAPI app with RESK-LLM security features.
+    
+    Args:
+        openai_api_key: OpenAI API key
+        anthropic_api_key: Anthropic API key
+        cohere_api_key: Cohere API key
+        openrouter_api_key: OpenRouter API key
+        deepseek_api_key: DeepSeek API key
+        cors_origins: List of allowed CORS origins
+        rate_limit: Rate limit for API calls
+        
+    Returns:
+        FastAPI app
+    """
+    if cors_origins is None:
+        cors_origins = ["*"]
+
+    if rate_limit is None:
+        rate_limit = 60
+
+    # Create the FastAPI app
+    app = FastAPI()
+
+    # Create the FastAPIProtector
+    protector = FastAPIProtector(
+        app=app,
+        default_model="gpt-4o",
+        rate_limit=rate_limit,
+        request_sanitization=True,
+        response_sanitization=True,
+        custom_patterns_dir=None,
+        enable_patterns_api=False,
+        patterns_api_prefix="/api/patterns",
+        api_key_header="X-API-Key",
+        agent_id_header="X-Agent-ID",
+        cors_origins=cors_origins,
+        agent_security_enabled=False,
+        agent_configs_file=None
+    )
+
+    # Add the protector to the app state
+    app.state.resk_fastapi_protector = protector
+
+    return app 

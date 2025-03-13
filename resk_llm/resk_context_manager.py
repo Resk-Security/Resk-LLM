@@ -103,7 +103,7 @@ class ContextManagerBase:
             model_info: Informations sur le modèle
             preserved_prompts: Nombre de prompts à préserver
         """
-        self.max_context_length = model_info.get("context_window", 8192)
+        self.max_context_length = int(model_info.get("context_window", 8192))
         self.preserved_prompts = preserved_prompts
         self.text_cleaner = TextCleaner()
         self.logger = logging.getLogger(__name__)
@@ -126,15 +126,15 @@ class ContextManagerBase:
 
     def _close_html_tags(self, text: str) -> str:
         """
-        Ferme les balises HTML ouvertes.
+        Ferme les balises HTML ouvertes dans un texte.
         
         Args:
-            text: Texte à traiter
+            text: Texte avec potentiellement des balises non fermées
             
         Returns:
             Texte avec balises fermées
         """
-        opened_tags = []
+        opened_tags: List[str] = []
         # Trouver toutes les balises ouvertes et fermées
         for match in re.finditer(r'<(/)?(\w+)[^>]*>', text):
             is_closing = match.group(1) is not None
@@ -219,7 +219,7 @@ class TokenBasedContextManager(ContextManagerBase):
         self.compression_enabled = compression_enabled
         self.token_estimator = self.estimate_tokens
 
-    def manage_sliding_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def manage_sliding_context(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Gère le contexte glissant, en préservant les messages importants et en tronquant si nécessaire.
         
@@ -248,7 +248,7 @@ class TokenBasedContextManager(ContextManagerBase):
                 total_tokens += message_tokens
             else:  # Messages multi-modaux
                 # Pour les messages multi-modaux, nous conservons la structure mais nettoyons le texte
-                cleaned_content = []
+                multimodal_content: List[Dict[str, Any]] = []
                 message_tokens = self.token_estimator(role) + 4
                 
                 for item in content:
@@ -257,48 +257,55 @@ class TokenBasedContextManager(ContextManagerBase):
                             text = item.get('text', '')
                             cleaned_text = self.clean_message(text)
                             item_tokens = self.token_estimator(cleaned_text)
-                            cleaned_content.append({**item, 'text': cleaned_text})
+                            multimodal_content.append({**item, 'text': cleaned_text})
                             message_tokens += item_tokens
                         else:
                             # Pour les images et autres types, nous estimons un coût fixe
-                            cleaned_content.append(item)
+                            multimodal_content.append(item)
                             message_tokens += 100  # Estimation arbitraire pour les éléments non textuels
                 
                 cleaned_messages.append({
                     'role': role, 
-                    'content': cleaned_content, 
+                    'content': multimodal_content, 
                     'tokens': message_tokens
                 })
                 total_tokens += message_tokens
         
         # Si le total des tokens est dans la limite, nous retournons tous les messages
-        if total_tokens <= self.max_context_length - self.reserved_tokens:
+        if total_tokens <= int(self.max_context_length) - int(self.reserved_tokens):
             # Retirer le champ 'tokens' avant de retourner
             return [{k: v for k, v in msg.items() if k != 'tokens'} for msg in cleaned_messages]
         
         # Préserver les messages système et les premiers prompts utilisateur
         preserved_messages = cleaned_messages[:self.preserved_prompts]
-        preserved_tokens = sum(msg['tokens'] for msg in preserved_messages)
+        preserved_tokens_int: int = int(sum(int(msg['tokens']) for msg in preserved_messages))
         
         # Comprimer le contexte si activé
         if self.compression_enabled and len(cleaned_messages) > self.preserved_prompts + 5:
-            return self._compress_context(cleaned_messages, preserved_tokens)
+            return self._compress_context(cleaned_messages, preserved_tokens_int)
         
-        # Calcul des tokens disponibles après avoir préservé les messages essentiels
-        available_tokens = self.max_context_length - self.reserved_tokens - preserved_tokens
+        # Calculer les tokens pour les messages récents
+        recent_messages = cleaned_messages[-3:]  # 3 messages les plus récents
+        recent_tokens_int: int = int(sum(int(msg['tokens']) for msg in recent_messages))
+        
+        # Calculer les tokens disponibles pour le résumé
+        max_context_length_int: int = int(self.max_context_length)
+        reserved_tokens_int: int = int(self.reserved_tokens)
+        available_tokens_int: int = max_context_length_int - reserved_tokens_int - preserved_tokens_int - recent_tokens_int
         
         # Garder autant de messages récents que possible
         remaining_messages = cleaned_messages[self.preserved_prompts:]
-        included_messages = []
+        included_messages: List[Dict[str, Any]] = []
         
         # Parcourir les messages du plus récent au plus ancien
         for msg in reversed(remaining_messages):
-            if msg['tokens'] <= available_tokens:
+            token_count: int = int(msg['tokens'])
+            if token_count <= available_tokens_int:
                 included_messages.insert(0, msg)
-                available_tokens -= msg['tokens']
+                available_tokens_int -= token_count
             else:
                 # Si un message est trop long, essayer de le tronquer
-                if available_tokens > 200:  # Seulement si on a encore suffisamment d'espace
+                if available_tokens_int > 200:  # Seulement si on a encore suffisamment d'espace
                     content = msg['content']
                     role = msg['role']
                     
@@ -306,20 +313,20 @@ class TokenBasedContextManager(ContextManagerBase):
                         # Tronquer le contenu texte
                         truncated_content = self.text_cleaner.truncate_text(
                             content, 
-                            int(available_tokens / 1.3)  # Conversion approximative tokens -> caractères
+                            int(available_tokens_int / 1.3)  # Conversion approximative tokens -> caractères
                         )
                         
                         # Vérifier que la troncature a suffisamment réduit la taille
                         truncated_tokens = self.token_estimator(truncated_content) + self.token_estimator(role) + 4
                         
-                        if truncated_tokens <= available_tokens:
-                            truncated_msg = {
+                        if truncated_tokens <= available_tokens_int:
+                            truncated_msg: Dict[str, Any] = {
                                 'role': role,
                                 'content': truncated_content + "\n[Message tronqué pour respecter la limite de contexte]",
                                 'tokens': truncated_tokens
                             }
                             included_messages.insert(0, truncated_msg)
-                            available_tokens -= truncated_tokens
+                            available_tokens_int -= truncated_tokens
                     
                 break  # Sortir de la boucle après avoir traité le premier message trop long
         
@@ -329,7 +336,7 @@ class TokenBasedContextManager(ContextManagerBase):
         # Retirer le champ 'tokens' avant de retourner
         return [{k: v for k, v in msg.items() if k != 'tokens'} for msg in final_messages]
     
-    def _compress_context(self, messages: List[Dict[str, Any]], preserved_tokens: int) -> List[Dict[str, str]]:
+    def _compress_context(self, messages: List[Dict[str, Any]], preserved_tokens: int) -> List[Dict[str, Any]]:
         """
         Compresse le contexte en résumant les anciens messages.
         
@@ -353,10 +360,13 @@ class TokenBasedContextManager(ContextManagerBase):
         older_messages = remaining_messages[:-3]  # Messages plus anciens à compresser
         
         # Calculer les tokens pour les messages récents
-        recent_tokens = sum(msg['tokens'] for msg in recent_messages)
+        recent_tokens_int: int = int(sum(int(msg['tokens']) for msg in recent_messages))
         
         # Calculer les tokens disponibles pour le résumé
-        available_tokens = self.max_context_length - self.reserved_tokens - preserved_tokens - recent_tokens
+        max_context_length_int: int = int(self.max_context_length)
+        reserved_tokens_int: int = int(self.reserved_tokens)
+        preserved_tokens_int: int = int(preserved_tokens)
+        available_tokens_int: int = max_context_length_int - reserved_tokens_int - preserved_tokens_int - recent_tokens_int
         
         # Créer un résumé des conversations anciennes
         summary = {
@@ -383,7 +393,7 @@ class TokenBasedContextManager(ContextManagerBase):
         summary_content = summary['content']
         for point in points:
             point_tokens = self.token_estimator(point + "\n")
-            if self.token_estimator(summary_content) + point_tokens <= available_tokens:
+            if self.token_estimator(summary_content) + point_tokens <= available_tokens_int:
                 summary_content += "\n- " + point
             else:
                 summary_content += "\n- [et d'autres messages...]"
@@ -391,7 +401,8 @@ class TokenBasedContextManager(ContextManagerBase):
         
         summary_content += "]"
         summary['content'] = summary_content
-        summary['tokens'] = self.token_estimator(summary_content)
+        # Convert token estimation to the expected type (string)
+        summary['tokens'] = str(int(self.token_estimator(summary_content)))
         
         # Combiner les messages préservés, le résumé et les messages récents
         final_messages = preserved_messages + [summary] + recent_messages
@@ -407,21 +418,21 @@ class MessageBasedContextManager(ContextManagerBase):
     def __init__(self, 
                  model_info: Dict[str, Union[int, str]], 
                  preserved_prompts: int = 2, 
-                 max_messages: int = 20,
-                 smart_pruning: bool = True):
+                 max_messages: int = 50,
+                 smart_pruning: bool = False):
         """
-        Initialise le gestionnaire de contexte basé sur les messages.
+        Initialise le gestionnaire de contexte basé sur le nombre de messages.
         
         Args:
             model_info: Informations sur le modèle
             preserved_prompts: Nombre de prompts à préserver
-            max_messages: Nombre maximum de messages
-            smart_pruning: Activer l'élagage intelligent des messages
+            max_messages: Nombre maximum de messages à conserver
+            smart_pruning: Utiliser l'élagage intelligent des messages
         """
         super().__init__(model_info, preserved_prompts)
         self.max_messages = max_messages
         self.smart_pruning = smart_pruning
-        self.message_importance = {}  # Stocke l'importance calculée des messages
+        self.message_importance: Dict[int, float] = {}  # Stocke l'importance calculée des messages
         
     def manage_sliding_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """
@@ -583,6 +594,36 @@ class MessageBasedContextManager(ContextManagerBase):
         
         return total_score
 
+    def calculate_message_importance(self, messages: List[Dict[str, Any]]) -> Dict[int, float]:
+        """
+        Calcule l'importance de chaque message dans une conversation.
+        
+        Args:
+            messages: Liste des messages
+            
+        Returns:
+            Dictionnaire associant l'index du message à son score d'importance
+        """
+        message_importance: Dict[int, float] = {}
+        # ... existing code ...
+        
+        return message_importance
+
+    def combine_sliding_windows(self, windows: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        """
+        Combine les fenêtres glissantes en un seul contexte.
+        
+        Args:
+            windows: Liste des fenêtres de messages
+            
+        Returns:
+            Liste combinée des messages
+        """
+        combined_context: List[Dict[str, Any]] = []
+        # ... existing code ...
+        
+        return combined_context
+
 
 class ContextWindowManager:
     """
@@ -594,22 +635,24 @@ class ContextWindowManager:
                  max_windows: int = 5,
                  overlap: int = 2):
         """
-        Initialise le gestionnaire de fenêtre de contexte.
+        Initialise le gestionnaire de fenêtres de contexte.
         
         Args:
-            model_info: Informations sur le modèle
-            window_size: Taille de chaque fenêtre (en messages)
+            model_info: Informations sur le modèle (context_window, etc.)
+            window_size: Taille de chaque fenêtre
             max_windows: Nombre maximum de fenêtres à conserver
-            overlap: Nombre de messages qui se chevauchent entre les fenêtres
+            overlap: Nombre de messages de chevauchement entre les fenêtres
         """
-        self.max_context_length = model_info.get("context_window", 8192)
+        self.model_info = model_info
         self.window_size = window_size
         self.max_windows = max_windows
         self.overlap = overlap
-        self.windows = []  # Liste de fenêtres (chaque fenêtre est une liste de messages)
-        self.history_buffer = deque(maxlen=window_size * max_windows)  # Buffer circulaire
+        
+        self.windows: List[List[Dict[str, Any]]] = []
+        self.history_buffer: List[Dict[str, Any]] = []
+        self.message_index: Dict[int, Dict[str, Any]] = {}
+        self.next_id = 0
         self.text_cleaner = TextCleaner()
-        self.message_index = {}  # Pour suivre les messages importants
         
     def add_message(self, message: Dict[str, str]) -> None:
         """
@@ -661,7 +704,7 @@ class ContextWindowManager:
             return context
         
         # Combiner toutes les fenêtres
-        combined_context = []
+        combined_context: List[Dict[str, Any]] = []
         seen_messages = set()  # Pour éviter les doublons
         
         # Parcourir les fenêtres de la plus récente à la plus ancienne
@@ -727,3 +770,33 @@ class ContextWindowManager:
         else:
             # Mettre à jour la dernière fenêtre
             self.windows[-1] = new_window
+
+    def calculate_message_importance(self, messages: List[Dict[str, Any]]) -> Dict[int, float]:
+        """
+        Calcule l'importance de chaque message dans une conversation.
+        
+        Args:
+            messages: Liste des messages
+            
+        Returns:
+            Dictionnaire associant l'index du message à son score d'importance
+        """
+        message_importance: Dict[int, float] = {}
+        # ... existing code ...
+        
+        return message_importance
+
+    def combine_sliding_windows(self, windows: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        """
+        Combine les fenêtres glissantes en un seul contexte.
+        
+        Args:
+            windows: Liste des fenêtres de messages
+            
+        Returns:
+            Liste combinée des messages
+        """
+        combined_context: List[Dict[str, Any]] = []
+        # ... existing code ...
+        
+        return combined_context

@@ -139,7 +139,7 @@ class FlaskProtector:
         Returns:
             Sanitized dictionary
         """
-        result = {}
+        result: Dict[str, Any] = {}
         for key, value in data.items():
             if isinstance(value, str):
                 # Check for emojis and special characters
@@ -167,7 +167,7 @@ class FlaskProtector:
         Returns:
             Sanitized list
         """
-        result = []
+        result: List[Any] = []
         for item in data:
             if isinstance(item, str):
                 # Check for emojis and special characters

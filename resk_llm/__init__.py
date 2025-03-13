@@ -77,7 +77,7 @@ try:
         SUBTLE_TOXICITY_PATTERNS,
         TOXICITY_KEYWORDS,
         CONTEXTUAL_PATTERNS,
-        check_toxic_content,
+        analyze_toxicity,
         moderate_text,
         
         # Emoji and Unicode protection

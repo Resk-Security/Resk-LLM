@@ -104,7 +104,7 @@ CONTROL_CHARS = {
     '\v': '\\v',  # Vertical Tab
     '\0': '\\0',  # Null character
     '\a': '\\a',  # Bell/Alert
-    '\e': '\\e',  # Escape
+    '\x1b': '\\x1b',  # Escape (was '\e')
     '\x1b': '\\x1b',  # Escape (hex)
     '\u001b': '\\u001b',  # Escape (unicode)
     '\u0000': '\\u0000',  # Null

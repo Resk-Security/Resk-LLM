@@ -59,7 +59,7 @@ class TestOpenAIProtector(unittest.TestCase):
         self.assertIn(messages[-2], managed)
 
     def test_manage_sliding_context_message_based(self):
-        message_based_manager = MessageBasedContextManager({"context_window": 4096}, preserved_prompts=2, max_messages=3)
+        message_based_manager = MessageBasedContextManager({"context_window": 4096}, preserved_prompts=2, max_messages=5)
         
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
@@ -74,7 +74,7 @@ class TestOpenAIProtector(unittest.TestCase):
         managed = message_based_manager.manage_sliding_context(messages)
 
         
-        self.assertEqual(len(managed), 5)  # 2 preserved + 3 context
+        self.assertEqual(len(managed), 5)  # 2 preserved + 3 recent messages
         self.assertEqual(managed[0], messages[0])  # First system message preserved
         self.assertEqual(managed[1], messages[1])  # Second system message preserved
         self.assertEqual(managed[2], messages[-3])  # Third-to-last message

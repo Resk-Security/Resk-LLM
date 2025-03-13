@@ -99,8 +99,10 @@ class ReskWordsLists:
         
         # Add known jailbreak patterns
         for pattern_str in KNOWN_JAILBREAK_PATTERNS:
+            # Get the pattern string from the compiled regex
+            pattern_string = pattern_str.pattern
             # Remove the (?i).* prefix/suffix typical in these patterns
-            clean_pattern = pattern_str.replace("(?i).*", "").replace(".*", "")
+            clean_pattern = pattern_string.replace("(?i).*", "").replace(".*", "")
             if clean_pattern:  # Only add if we have something meaningful left
                 self.prohibited_patterns.append(re.compile(clean_pattern, re.IGNORECASE))
     
@@ -309,8 +311,8 @@ class CustomPatternManager:
         # Create directory if it doesn't exist
         self.base_directory.mkdir(parents=True, exist_ok=True)
     
-    def create_custom_pattern_file(self, name: str, words: List[str] = None, 
-                                  patterns: List[str] = None) -> str:
+    def create_custom_pattern_file(self, name: str, words: Optional[List[str]] = None, 
+                                  patterns: Optional[List[str]] = None) -> str:
         """
         Create a new custom pattern file.
         

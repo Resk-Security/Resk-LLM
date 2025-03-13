@@ -167,13 +167,13 @@ class AgentSecurityMonitor:
                  max_consecutive_failures: int = 5,
                  max_inactivity_time: int = 3600):
         """
-        Initialise le moniteur de sécurité.
+        Initialise le moniteur de sécurité pour agents.
         
         Args:
-            identity_manager: Gestionnaire d'identité
-            model: Modèle OpenAI à utiliser
-            rate_limit: Limite d'actions par minute
-            max_consecutive_failures: Nombre maximum d'échecs consécutifs autorisés
+            identity_manager: Gestionnaire d'identité des agents
+            model: Modèle LLM à utiliser
+            rate_limit: Nombre maximum d'actions par minute
+            max_consecutive_failures: Nombre maximum d'échecs consécutifs avant révocation
             max_inactivity_time: Temps maximum d'inactivité en secondes
         """
         self.identity_manager = identity_manager
@@ -182,8 +182,8 @@ class AgentSecurityMonitor:
         self.max_consecutive_failures = max_consecutive_failures
         self.max_inactivity_time = max_inactivity_time
         
-        self.action_counts = {}  # uuid: {minute_timestamp: count}
-        self.consecutive_failures = {}  # uuid: count
+        self.action_counts: Dict[str, Dict[int, int]] = {}  # uuid: {minute_timestamp: count}
+        self.consecutive_failures: Dict[str, int] = {}  # uuid: count
         
     def monitor_action(self, agent_id: str, action: str, 
                       action_type: str, resource: Optional[str] = None) -> Tuple[bool, str]:
@@ -205,7 +205,7 @@ class AgentSecurityMonitor:
         
         # Vérifier l'inactivité
         agent_info = self.identity_manager.get_agent_info(agent_id)
-        if time.time() - agent_info["last_action"] > self.max_inactivity_time:
+        if agent_info is not None and time.time() - agent_info["last_action"] > self.max_inactivity_time:
             self.identity_manager.revoke_agent(agent_id)
             return False, "Agent inactif depuis trop longtemps"
         
@@ -234,7 +234,7 @@ class AgentSecurityMonitor:
             return False, "Trop d'échecs consécutifs"
         
         # Vérifier le contenu de l'action
-        if action_type == "api_call" and resource:
+        if action_type == "api_call" and resource and agent_info is not None:
             # Vérifier si l'API est autorisée
             if not self._is_api_allowed(resource, agent_info["permissions"]):
                 self.identity_manager.log_action(agent_id, action, "blocked")
@@ -338,7 +338,7 @@ class AgentSandbox:
                  allowed_resources: Optional[Set[str]] = None,
                  context_tracking: bool = True):
         """
-        Initialise le sandbox.
+        Initialise un sandbox pour un agent.
         
         Args:
             agent_id: UUID de l'agent
@@ -350,7 +350,7 @@ class AgentSandbox:
         self.security_monitor = security_monitor
         self.allowed_resources = allowed_resources or set()
         self.context_tracking = context_tracking
-        self.context = []
+        self.context: List[Dict[str, Any]] = []
         
     def execute_action(self, action: str, action_type: str, 
                       resource: Optional[str] = None) -> Dict[str, Any]:
@@ -524,17 +524,16 @@ class SecureAvatar:
 
 class AgentSecurityManager:
     """
-    Gestionnaire de sécurité pour agents autonomes.
-    Combine les fonctionnalités d'identité et de surveillance pour une sécurité complète.
+    Gestionnaire de sécurité global pour agents autonomes.
     """
     
     def __init__(self, model: str = "gpt-4o", rate_limit: int = 100):
         """
-        Initialise le gestionnaire de sécurité pour agents.
+        Initialise le gestionnaire de sécurité.
         
         Args:
-            model: Le modèle LLM à utiliser pour l'analyse de sécurité
-            rate_limit: Limite de nombre d'actions par minute
+            model: Modèle LLM à utiliser
+            rate_limit: Limite d'actions par minute
         """
         self.identity_manager = AgentIdentityManager()
         self.security_monitor = AgentSecurityMonitor(
@@ -542,7 +541,7 @@ class AgentSecurityManager:
             model=model,
             rate_limit=rate_limit
         )
-        self.sandboxes = {}
+        self.sandboxes: Dict[str, AgentSandbox] = {}
         
     def register_agent(self, name: str, role: str, permissions: List[str]) -> str:
         """
