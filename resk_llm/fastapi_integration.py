@@ -56,7 +56,13 @@ class AgentSecurityConfig(BaseModel):
     allowed_models: List[str] = Field(default_factory=list)
     api_keys: List[str] = Field(default_factory=list)
     is_active: bool = True
-    
+    temperature: Optional[float] = 0.7
+    prohibited_words: Optional[List[str]] = Field(default_factory=list)
+    prohibited_patterns: Optional[List[str]] = Field(default_factory=list)
+    enable_pii_detection: Optional[bool] = True
+    enable_moderation: Optional[bool] = True
+    moderation_threshold: Optional[float] = 0.8
+
 class Rate:
     """Rate tracking for rate limiting."""
     def __init__(self, limit: int = 60, window: int = 60):
@@ -487,4 +493,12 @@ def agent_permission_required(permission: str):
         
         return True
     
-    return check_permission 
+    return check_permission
+
+class PatternCreateRequest(BaseModel):
+    """Request model for creating or updating custom patterns."""
+    name: str = Field(..., description="Name of the pattern set")
+    description: Optional[str] = Field(None, description="Description of the pattern set")
+    prohibited_words: List[str] = Field(default_factory=list, description="List of prohibited words")
+    prohibited_patterns: List[str] = Field(default_factory=list, description="List of regex patterns")
+    is_active: bool = Field(True, description="Whether the pattern set is active") 
