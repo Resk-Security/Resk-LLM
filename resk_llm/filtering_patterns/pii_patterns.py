@@ -46,7 +46,7 @@ PII_PATTERNS: Dict[str, Pattern] = {
 NAME_PATTERNS: Dict[str, Pattern] = {
     "full_name": re.compile(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b'),
     "name_with_initial": re.compile(r'\b[A-Z][a-z]+\s+[A-Z]\.(?:\s+[A-Z][a-z]+)?\b'),
-    "possible_pseudonym": re.compile(r'\b(?:aka|a\.k\.a\.|alias|known as|nicknamed)\s+["']?([A-Za-z0-9_]+)["']?\b', re.IGNORECASE)
+    "possible_pseudonym": re.compile(r'\b(?:aka|a\.k\.a\.|alias|known as|nicknamed)\s+["\'"]?([A-Za-z0-9_]+)["\'"]?\b', re.IGNORECASE)
 }
 
 # Mots-clés pour détecter les tentatives de doxxing

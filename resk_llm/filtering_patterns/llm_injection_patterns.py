@@ -6,7 +6,7 @@ from typing import Dict, List, Pattern
 import re
 
 # Regex compilés pour différents types d'injections
-REGEX_PATTERNS: Dict[str, Pattern] = {
+INJECTION_REGEX_PATTERNS: Dict[str, Pattern] = {
     # Patterns d'injection de base
     "ignore_instructions": re.compile(
         r"(?i)(ignore|disregard|forget|don't follow)( all | the | previous | above | your | earlier )?( instructions| guidelines| rules| constraints)", 
@@ -67,7 +67,7 @@ REGEX_PATTERNS: Dict[str, Pattern] = {
 }
 
 # Liste des mots clés à vérifier
-KEYWORD_LISTS: Dict[str, List[str]] = {
+INJECTION_KEYWORD_LISTS: Dict[str, List[str]] = {
     "toxic_intent": [
         "hack", "exploit", "bypass", "crack", "steal", "phish", "malware", 
         "ransomware", "virus", "trojan", "botnet", "keylogger", "spyware"
@@ -118,13 +118,13 @@ def check_text_for_injections(text: str) -> Dict[str, List[str]]:
     results = {}
     
     # Vérifier les patterns d'expression régulière
-    for pattern_name, pattern in REGEX_PATTERNS.items():
+    for pattern_name, pattern in INJECTION_REGEX_PATTERNS.items():
         matches = pattern.findall(text)
         if matches:
             results[pattern_name] = matches
     
     # Vérifier les listes de mots-clés
-    for list_name, keywords in KEYWORD_LISTS.items():
+    for list_name, keywords in INJECTION_KEYWORD_LISTS.items():
         matches = []
         for keyword in keywords:
             # Chercher le mot-clé avec des limites de mot
