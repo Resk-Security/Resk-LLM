@@ -9,36 +9,33 @@ des grands modèles de langage (LLM) contre diverses menaces, notamment:
 - La fuite d'informations sensibles ou personnelles
 - Les contenus toxiques et inappropriés
 - L'usurpation d'identité et l'obfuscation
+- Les attaques par similarité vectorielle
+- Les fuites de données via jetons canari
 
 Cette bibliothèque est spécialement conçue pour renforcer la sécurité des agents autonomes
 en fournissant des protections robustes pour leurs interactions avec les utilisateurs et systèmes.
 """
 
-__version__ = "0.3.0"
+from .version import __version__
 
-# Import core components
-from resk_llm.tokenizer_protection import (
-    ReskWordsLists, 
-    ReskProtectorTokenizer,
-    CustomPatternManager
-)
+# Core components
+from .resk_context_manager import TokenBasedContextManager
+from .tokenizer_protection import ReskWordsLists, CustomPatternManager
+from .filtering_patterns import check_pii_content, moderate_text, anonymize_text
+from .providers_integration import OpenAIProtector, AnthropicProtector, CohereProtector
 
-from resk_llm.resk_context_manager import (
-    TextCleaner,
-    ContextManagerBase,
-    TokenBasedContextManager,
-    MessageBasedContextManager,
-    ContextWindowManager
-)
+# Advanced security components
+from .text_analysis import TextAnalyzer  
+from .competitor_filter import CompetitorFilter
+from .url_detector import URLDetector
+from .ip_protection import IPProtection
+from .regex_pattern_manager import RegexPatternManager
 
-# Import provider integrations
-from resk_llm.providers_integration import (
-    BaseProviderProtector,
-    AnthropicProtector,
-    CohereProtector,
-    DeepSeekProtector,
-    OpenRouterProtector
-)
+# Existing security components
+from .heuristic_filter import HeuristicFilter
+from .vector_db import VectorDatabase
+from .canary_tokens import CanaryTokenManager, CanaryTokenDetector
+from .prompt_security import PromptSecurityManager
 
 # Import framework integrations
 from resk_llm.flask_integration import FlaskProtector
@@ -116,36 +113,30 @@ except ImportError:
 
 # Define what's available in the public API
 __all__ = [
-    # Version
-    "__version__",
+    # Core functionality
+    'TokenBasedContextManager',
+    'ReskWordsLists',
+    'CustomPatternManager',
+    'OpenAIProtector',
+    'AnthropicProtector',
+    'CohereProtector',
     
-    # Tokenizer protection
-    "ReskWordsLists",
-    "ReskProtectorTokenizer",
-    "CustomPatternManager",
+    # Filtering and content moderation
+    'check_pii_content',
+    'moderate_text',
+    'anonymize_text',
     
-    # Context management
-    "TextCleaner",
-    "ContextManagerBase",
-    "TokenBasedContextManager",
-    "MessageBasedContextManager",
-    "ContextWindowManager",
+    # Advanced security features
+    'TextAnalyzer',
+    'CompetitorFilter',
+    'URLDetector',
+    'IPProtection',
+    'RegexPatternManager',
     
-    # Provider integrations
-    "BaseProviderProtector",
-    "AnthropicProtector",
-    "CohereProtector",
-    "DeepSeekProtector",
-    "OpenRouterProtector",
-    
-    # Framework integrations
-    "FlaskProtector",
-    "FastAPIProtector",
-    
-    # Agent security
-    "AgentSecurityManager",
-    "AgentPermission",
-    "AgentIdentity",
-    "SecureAgentExecutor",
-    "AGENT_DEFAULT_PERMISSIONS"
+    # Existing security components
+    'HeuristicFilter',
+    'VectorDatabase',
+    'CanaryTokenManager',
+    'CanaryTokenDetector',
+    'PromptSecurityManager',
 ]
