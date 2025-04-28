@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 import pytest
 '''
 # Initialize the OpenAI client
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="")
 model = "gpt-4o"
 # Initializing the protector
 protector = OpenAIProtector(model=model, context_manager=TokenBasedContextManager(RESK_MODELS[model]))
