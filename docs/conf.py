@@ -25,14 +25,14 @@ except ImportError:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc', # Core library for html generation from docstrings
-    'sphinx.ext.napoleon', # Support for NumPy and Google style docstrings
-    'sphinx.ext.intersphinx', # Link to other projects' documentation
-    'sphinx.ext.viewcode', # Add links to source code
-    'myst_parser', # Enable parsing Markdown files
-    'sphinx_autoapi.extension', # Auto-generate API docs from code
-    "autoapi.extension"
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.viewcode',
+    'myst_parser',
+    'autoapi.extension',  # Only this, not 'sphinx_autoapi.extension'
 ]
+
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
