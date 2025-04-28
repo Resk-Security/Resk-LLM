@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-with open("LICENCE.txt", "r", encoding="utf-8") as f:
+with open("LICENCE", "r", encoding="utf-8") as f:
     license_text = f.read()
 
 setup(
