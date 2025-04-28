@@ -35,11 +35,9 @@ def test_token_based_context_manager():
         assert len(managed_with_large) >= 2, "Should preserve at least system and one user message"
         
         print("All tests completed successfully!")
-        return True
         
     except Exception as e:
         print(f"Error during testing: {str(e)}")
-        return False
 
 if __name__ == "__main__":
     success = test_token_based_context_manager()

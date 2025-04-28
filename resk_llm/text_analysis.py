@@ -225,7 +225,7 @@ class TextAnalyzer:
         Returns:
             Dictionary with all analysis results
         """
-        results = {
+        results: Dict[str, Any] = {
             'invisible_text': self.detect_invisible_text(text),
             'homoglyphs': self.detect_homoglyphs(text),
             'unusual_spaces': self.detect_unusual_space_chars(text),
@@ -242,7 +242,7 @@ class TextAnalyzer:
                     max_risk = finding['risk']
         
         results['overall_risk'] = max_risk
-        results['has_issues'] = any(len(results[key]) > 0 for key in ['invisible_text', 'homoglyphs', 'unusual_spaces'])
+        results['has_issues'] = bool(any(len(results[key]) > 0 for key in ['invisible_text', 'homoglyphs', 'unusual_spaces']))
         
         return results
     

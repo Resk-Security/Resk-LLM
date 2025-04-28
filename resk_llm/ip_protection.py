@@ -76,6 +76,18 @@ class IPProtection:
             'mac': mac_matches
         }
     
+    def detect_mac_addresses(self, text: str) -> List[str]:
+        """
+        Detect MAC addresses in text.
+
+        Args:
+            text: Text to check for MAC addresses
+
+        Returns:
+            List of detected MAC addresses
+        """
+        return self.mac_regex.findall(text)
+    
     def is_private_ip(self, ip: str) -> bool:
         """
         Check if an IP address is private.
@@ -88,27 +100,37 @@ class IPProtection:
         """
         # Check cache first
         if ip in self.ip_classification_cache:
+            self.logger.debug(f"IP Cache hit for {ip}: {self.ip_classification_cache[ip]}")
             return self.ip_classification_cache[ip]
         
         try:
             ip_obj = ipaddress.ip_address(ip)
             
+            is_loopback = ip_obj.is_loopback
+            is_private = ip_obj.is_private
+            self.logger.debug(f"Checking IP: {ip} -> Parsed: {ip_obj}, is_loopback: {is_loopback}, is_private: {is_private}")
+
             # Localhost is always private
-            if ip_obj.is_loopback:
+            if is_loopback:
                 self.ip_classification_cache[ip] = True
+                self.logger.debug(f"IP {ip} classified as PRIVATE (loopback)")
                 return True
             
             # Check if it's in a private range
-            if ip_obj.is_private:
+            if is_private:
                 self.ip_classification_cache[ip] = True
+                self.logger.debug(f"IP {ip} classified as PRIVATE (is_private=True)")
                 return True
             
             # It's a public IP
             self.ip_classification_cache[ip] = False
+            self.logger.debug(f"IP {ip} classified as PUBLIC")
             return False
             
         except ValueError:
             # If we can't parse it, consider it private to be safe
+            self.logger.warning(f"IP {ip} could not be parsed. Classifying as PRIVATE (ValueError)")
+            self.ip_classification_cache[ip] = True # Cache the error case as private
             return True
     
     def classify_ips(self, ips: Dict[str, List[str]]) -> Dict[str, Dict[str, List[str]]]:
@@ -121,7 +143,7 @@ class IPProtection:
         Returns:
             Dictionary with classified IP addresses
         """
-        result = {
+        result: Dict[str, Dict[str, List[str]]] = {
             'private': {
                 'ipv4': [],
                 'ipv6': [],
@@ -189,12 +211,13 @@ class IPProtection:
         Returns:
             Dictionary with detection results
         """
-        result = {
+        result: Dict[str, Any] = {
             'has_ip_leakage': False,
             'ips': {},
             'classified_ips': {},
             'public_ip_count': 0,
             'private_ip_count': 0,
+            'mac_address_count': 0,
             'network_commands': [],
             'risk_level': 'none'
         }
@@ -206,24 +229,35 @@ class IPProtection:
         result['classified_ips'] = self.classify_ips(result['ips'])
         
         # Count IPs
-        result['public_ip_count'] = sum(len(ips) for _, ips in result['classified_ips']['public'].items())
-        result['private_ip_count'] = sum(len(ips) for _, ips in result['classified_ips']['private'].items())
+        public_ip_count = sum(len(ips) for ip_type, ips in result['classified_ips']['public'].items() if ip_type != 'mac')
+        private_ip_count = sum(len(ips) for ip_type, ips in result['classified_ips']['private'].items() if ip_type != 'mac')
+        mac_address_count = len(result['classified_ips']['private']['mac']) # Count MACs separately
+        
+        result['public_ip_count'] = public_ip_count
+        result['private_ip_count'] = private_ip_count
+        result['mac_address_count'] = mac_address_count # Store MAC count
         
         # Detect network commands
         result['network_commands'] = self.detect_network_commands(text)
+        network_cmd_count = len(result['network_commands'])
         
         # Determine if there's a leak
-        if result['public_ip_count'] > 0:
+        # Reset flags before evaluation
+        result['has_ip_leakage'] = False
+        result['risk_level'] = 'none'
+
+        if public_ip_count > 0:
             result['has_ip_leakage'] = True
             
-            # Determine risk level
-            if result['public_ip_count'] > 5 or len(result['network_commands']) > 2:
+            # Determine risk level (considering public IPs and commands)
+            if public_ip_count > 5 or network_cmd_count > 2:
                 result['risk_level'] = 'high'
-            elif result['public_ip_count'] > 1 or len(result['network_commands']) > 0:
+            elif public_ip_count > 1 or network_cmd_count > 0:
                 result['risk_level'] = 'medium'
             else:
                 result['risk_level'] = 'low'
-        elif result['private_ip_count'] > 0 or len(result['network_commands']) > 0:
+        # Also consider private IPs, MACs, or commands as low risk leakage
+        elif private_ip_count > 0 or mac_address_count > 0 or network_cmd_count > 0:
             result['has_ip_leakage'] = True
             result['risk_level'] = 'low'
         
@@ -295,14 +329,14 @@ class IPProtection:
         
         return redacted, detection
     
-    def get_system_ips(self) -> Dict[str, List[str]]:
+    def get_system_ips(self) -> Dict[str, Union[str, List[str], None]]:
         """
         Get IP addresses of the current system.
         
         Returns:
             Dictionary with lists of system IP addresses
         """
-        system_ips = {
+        system_ips: Dict[str, Union[str, List[str], None]] = {
             'hostname': socket.gethostname(),
             'local_ips': [],
             'public_ip': None

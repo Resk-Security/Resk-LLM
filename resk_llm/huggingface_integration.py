@@ -4,7 +4,10 @@ import logging
 import traceback
 from typing import Any, Dict, List, Optional, Union, Callable
 
-from resk_llm.openai_protector import OpenAIProtector
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from resk_llm.openai_protector import OpenAIProtector  # type: ignore [import-untyped]
 from resk_llm.tokenizer_protection import SecureTokenizer, TokenizerProtector
 
 # Configuration du logger

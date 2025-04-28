@@ -16,6 +16,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Resk-Security/Resk-LLM",
     packages=find_packages(),
+    package_data={"resk_llm": ["py.typed"]},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -47,6 +48,7 @@ setup(
         "pytest-asyncio>=0.23.5",
         "sentence-transformers>=2.2.2",  # For creating embeddings
         "tldextract>=3.4.4",  # For URL domain extraction
+        "mypy",
     ],
     extras_require={
         "cuda": ["torch>=2.0.0"],

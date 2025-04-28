@@ -2,6 +2,9 @@ import re
 import logging
 from typing import List, Dict, Union
 
+import resk_llm.prohibited_words as prohibited_words # type: ignore [import-untyped]
+import resk_llm.prohibited_patterns_eng as prohibited_patterns_eng # type: ignore [import-untyped]
+
 from resk_llm.prohibited_words import RESK_WORDS_LIST
 from resk_llm.prohibited_patterns_eng import RESK_PROHIBITED_PATTERNS_ENG
 

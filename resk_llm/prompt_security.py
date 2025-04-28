@@ -19,12 +19,12 @@ class PromptSecurityManager:
     
     def __init__(
         self, 
-        embedding_function: Callable[[str], np.ndarray] = None,
+        embedding_function: Optional[Callable[[str], np.ndarray]] = None,
         embedding_dim: int = 1536,
         similarity_threshold: float = 0.85,
         use_canary_tokens: bool = True,
         enable_heuristic_filter: bool = True,
-        vector_db_path: str = None
+        vector_db_path: Optional[str] = None
     ):
         """
         Initialize the prompt security manager.
@@ -46,12 +46,16 @@ class PromptSecurityManager:
         self.use_canary_tokens = use_canary_tokens
         self.enable_heuristic_filter = enable_heuristic_filter
         
+        # Initialize components with proper Optional types
+        self.heuristic_filter: Optional[HeuristicFilter] = None
+        self.vector_db: Optional[VectorDatabase] = None
+        self.canary_manager: Optional[CanaryTokenManager] = None
+        self.canary_detector: Optional[CanaryTokenDetector] = None
+        
         # Initialize components
         if self.enable_heuristic_filter:
             self.heuristic_filter = HeuristicFilter()
             self.logger.info("Initialized heuristic filter")
-        else:
-            self.heuristic_filter = None
             
         if self.embedding_function is not None:
             self.vector_db = VectorDatabase(
@@ -68,16 +72,12 @@ class PromptSecurityManager:
                 else:
                     self.logger.warning(f"Failed to load vector database from {vector_db_path}")
         else:
-            self.vector_db = None
             self.logger.warning("No embedding function provided, vector database features disabled")
             
         if self.use_canary_tokens:
             self.canary_manager = CanaryTokenManager()
             self.canary_detector = CanaryTokenDetector()
             self.logger.info("Initialized canary token manager")
-        else:
-            self.canary_manager = None
-            self.canary_detector = None
         
         # Statistics tracking
         self.requests_processed = 0
@@ -88,7 +88,7 @@ class PromptSecurityManager:
     def secure_prompt(
         self, 
         prompt: str, 
-        context_info: Dict[str, Any] = None,
+        context_info: Optional[Dict[str, Any]] = None,
         check_only: bool = False
     ) -> Tuple[str, Dict[str, Any]]:
         """
@@ -104,16 +104,20 @@ class PromptSecurityManager:
         """
         self.requests_processed += 1
         
-        # Initialize result container
-        security_info = {
+        # Initialize result container with explicit typing for lists
+        security_info: Dict[str, Any] = {
             'original_length': len(prompt),
             'is_blocked': False,
             'is_suspicious': False,
             'risk_score': 0.0,
-            'actions_taken': [],
+            'actions_taken': [],  # This is a list
             'canary_token': None,
-            'similar_attacks': []
+            'similar_attacks': []  # This is a list
         }
+        
+        # Explicitly ensure actions_taken is a list for type checker
+        actions_taken: List[str] = security_info['actions_taken']
+        similar_attacks: List[Dict[str, Any]] = security_info['similar_attacks']
         
         modified_prompt = prompt
         
@@ -125,7 +129,7 @@ class PromptSecurityManager:
                 security_info['is_blocked'] = True
                 security_info['block_reason'] = reason
                 security_info['risk_score'] = 1.0
-                security_info['actions_taken'].append('blocked_by_heuristic')
+                actions_taken.append('blocked_by_heuristic')
                 
                 self.requests_blocked += 1
                 self.logger.warning(f"Prompt blocked by heuristic filter: {reason}")
@@ -143,19 +147,21 @@ class PromptSecurityManager:
                 # Check for similarity to known attacks
                 is_similar, match_info = self.vector_db.is_similar_to_known_attack(prompt_embedding)
                 
-                if is_similar:
+                if is_similar and match_info:
                     security_info['is_suspicious'] = True
-                    security_info['similar_attacks'].append(match_info)
-                    security_info['risk_score'] = max(security_info['risk_score'], match_info['similarity'])
-                    security_info['actions_taken'].append('similar_to_known_attack')
+                    similar_attacks.append(match_info)
+                    # Safely access similarity with a default value if it doesn't exist
+                    similarity = match_info.get('similarity', 0.0)
+                    security_info['risk_score'] = max(security_info['risk_score'], similarity)
+                    actions_taken.append('similar_to_known_attack')
                     
                     self.requests_flagged += 1
-                    self.logger.warning(f"Prompt similar to known attack: {match_info['similarity']:.2f} similarity")
+                    self.logger.warning(f"Prompt similar to known attack: {similarity:.2f} similarity")
                     
                     # Optionally block if above threshold
-                    if match_info['similarity'] > 0.95:  # Very high similarity
+                    if similarity > 0.95:  # Very high similarity
                         security_info['is_blocked'] = True
-                        security_info['block_reason'] = f"Very similar to known attack ({match_info['similarity']:.2f} similarity)"
+                        security_info['block_reason'] = f"Very similar to known attack ({similarity:.2f} similarity)"
                         self.requests_blocked += 1
                         
                         if not check_only:
@@ -178,7 +184,7 @@ class PromptSecurityManager:
                 
             except Exception as e:
                 self.logger.error(f"Error during vector database check: {str(e)}")
-                security_info['actions_taken'].append('vector_db_error')
+                actions_taken.append('vector_db_error')
         
         # Step 3: Insert canary token if enabled and not in check_only mode
         if self.use_canary_tokens and self.canary_manager and not check_only and not security_info['is_blocked']:
@@ -190,13 +196,13 @@ class PromptSecurityManager:
                 
                 modified_prompt, token = self.canary_manager.insert_canary_token(modified_prompt, token_context)
                 security_info['canary_token'] = token
-                security_info['actions_taken'].append('canary_token_added')
+                actions_taken.append('canary_token_added')
                 
                 self.logger.info(f"Added canary token to prompt: {token}")
                 
             except Exception as e:
                 self.logger.error(f"Error inserting canary token: {str(e)}")
-                security_info['actions_taken'].append('canary_token_error')
+                actions_taken.append('canary_token_error')
         
         # Finalize security information
         security_info['final_length'] = len(modified_prompt)
@@ -207,7 +213,7 @@ class PromptSecurityManager:
         
         return modified_prompt, security_info
     
-    def check_response(self, response: str, associated_tokens: List[str] = None) -> Dict[str, Any]:
+    def check_response(self, response: str, associated_tokens: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Check a response from an LLM for security issues, including token leaks.
         
@@ -218,12 +224,17 @@ class PromptSecurityManager:
         Returns:
             Dict with security information
         """
-        result = {
+        result: Dict[str, Any] = {
             'has_leaked_tokens': False,
             'leaked_tokens': [],
             'detected_canary_tokens': [],
             'other_issues': []
         }
+        
+        # Extract lists with proper typing for type checker
+        leaked_tokens: List[Dict[str, Any]] = result['leaked_tokens']
+        detected_canary_tokens: List[str] = result['detected_canary_tokens']
+        other_issues: List[str] = result['other_issues']
         
         # Check for canary token leaks if enabled
         if self.use_canary_tokens and self.canary_manager:
@@ -233,7 +244,8 @@ class PromptSecurityManager:
                 
                 if tokens_found:
                     result['has_leaked_tokens'] = True
-                    result['leaked_tokens'] = leak_details
+                    # Extend the list instead of assigning to avoid type issues
+                    leaked_tokens.extend(leak_details)
                     
                     self.logger.warning(f"Response contains leaked canary tokens: {len(leak_details)}")
                 
@@ -246,65 +258,115 @@ class PromptSecurityManager:
                             if not result['has_leaked_tokens']:
                                 result['has_leaked_tokens'] = True
                                 # We don't have the metadata here, so just record the token
-                                result['leaked_tokens'].append({'token': token, 'context': {'associated': True}})
+                                leaked_tokens.append({'token': token, 'context': {'associated': True}})
             
             except Exception as e:
                 self.logger.error(f"Error checking for canary token leaks: {str(e)}")
-                result['other_issues'].append(f"Error checking for token leaks: {str(e)}")
+                other_issues.append(f"Error checking for token leaks: {str(e)}")
         
         # Use the generic detector to find any canary tokens, even from other systems
         if self.canary_detector:
             try:
-                detected_tokens = self.canary_detector.detect_tokens(response)
-                if detected_tokens:
-                    result['detected_canary_tokens'] = detected_tokens
-                    self.logger.warning(f"Response contains potential canary tokens: {detected_tokens}")
+                detector_tokens = self.canary_detector.detect_tokens(response)
+                if detector_tokens:
+                    detected_canary_tokens.extend(detector_tokens)
+                    self.logger.warning(f"Response contains potential canary tokens: {detector_tokens}")
             except Exception as e:
                 self.logger.error(f"Error detecting canary tokens: {str(e)}")
+                other_issues.append(f"Error detecting canary tokens: {str(e)}")
         
         return result
     
-    def add_attack_pattern(self, text: str, metadata: Dict[str, Any] = None) -> bool:
+    def add_attack_pattern(self, pattern_text: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Add a known attack pattern to the vector database.
+        Add a known attack pattern to the vector database
         
         Args:
-            text: The text of the attack pattern
-            metadata: Additional metadata about the attack
+            pattern_text: The prompt injection text pattern to add
+            metadata: Optional metadata to store with the pattern
             
         Returns:
-            bool: True if added successfully, False otherwise
+            Dict with status information
         """
-        if not self.vector_db or not self.embedding_function:
-            self.logger.error("Cannot add attack pattern: vector database or embedding function not available")
-            return False
+        result: Dict[str, Any] = {
+            'success': False,
+            'errors': [],
+            'embedding_generated': False,
+            'added_to_db': False
+        }
+        
+        # Extract list with proper typing for type checker
+        errors: List[str] = result['errors']
+        
+        # We need both the vector database and embedding function to be available
+        if not self.vector_db:
+            errors.append("Vector database not initialized")
+            return result
+            
+        if not self.embedding_function:
+            errors.append("Embedding function not initialized")
+            return result
             
         try:
-            # Generate embedding
-            embedding = self.embedding_function(text)
+            # Clean and normalize the pattern
+            pattern = self._normalize_text(pattern_text)
             
-            # Default metadata
+            # Generate an embedding for the pattern
+            embedding = self.embedding_function(pattern)
+            if embedding is None:
+                errors.append("Failed to generate embedding - returned None")
+                return result
+                
+            result['embedding_generated'] = True
+            
+            # Create metadata if not provided
             if metadata is None:
                 metadata = {}
                 
+            # Add some standard metadata fields
             metadata.update({
-                'timestamp': datetime.now().isoformat(),
-                'is_known_attack': True,
-                'text_preview': text[:100] + ('...' if len(text) > 100 else ''),
-                'added_manually': True
+                'source': 'manual_addition',
+                'added_at': datetime.now().isoformat(),
+                'type': 'attack_pattern'
             })
             
-            # Add to database
-            success = self.vector_db.add_embedding(embedding, metadata)
-            
-            if success:
-                self.logger.info(f"Added attack pattern to vector database: {metadata['text_preview']}")
-            
-            return success
+            # Add to the vector database
+            if self.vector_db:  # Extra check to satisfy type checker
+                self.vector_db.add_embedding(embedding, metadata)
+                result['added_to_db'] = True
+                result['success'] = True
+                self.logger.info(f"Added attack pattern to vector database: '{pattern[:30]}...'")
             
         except Exception as e:
             self.logger.error(f"Error adding attack pattern: {str(e)}")
-            return False
+            errors.append(f"Exception: {str(e)}")
+            
+        return result
+    
+    def _normalize_text(self, text: str) -> str:
+        """
+        Clean and normalize text for consistent processing.
+        
+        Args:
+            text: The text to normalize
+            
+        Returns:
+            Normalized text
+        """
+        if not text:
+            return ""
+            
+        # Basic normalization steps
+        normalized = text.strip()
+        
+        # Remove excessive whitespace
+        import re
+        normalized = re.sub(r'\s+', ' ', normalized)
+        
+        # Convert to lowercase for case-insensitive matching
+        normalized = normalized.lower()
+        
+        return normalized
     
     def save_state(self, base_path: str) -> Dict[str, bool]:
         """

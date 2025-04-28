@@ -2,7 +2,7 @@ import re
 import logging
 import json
 import os
-from typing import List, Dict, Any, Tuple, Optional, Set, Union
+from typing import List, Dict, Any, Tuple, Optional, Set, Union, Pattern, cast
 from pathlib import Path
 
 class CompetitorFilter:
@@ -106,7 +106,7 @@ class CompetitorFilter:
             self.logger.error(f"Error loading configuration: {str(e)}")
             return False
     
-    def add_competitor(self, name: str, products: List[str] = None, domain: str = None) -> None:
+    def add_competitor(self, name: str, products: Optional[List[str]] = None, domain: Optional[str] = None) -> None:
         """
         Add a competitor to the filter.
         
@@ -123,7 +123,7 @@ class CompetitorFilter:
         if domain:
             self.competitor_domains.add(domain.lower())
     
-    def add_banned_code(self, pattern: str, language: str = None, description: str = None) -> None:
+    def add_banned_code(self, pattern: str, language: Optional[str] = None, description: Optional[str] = None) -> None:
         """
         Add a banned code pattern.
         
@@ -163,7 +163,7 @@ class CompetitorFilter:
         """
         self.banned_substrings.add(substring)
     
-    def add_regex_pattern(self, pattern: str, name: str = None, description: str = None) -> bool:
+    def add_custom_regex(self, pattern: str, name: Optional[str] = None, description: Optional[str] = None) -> bool:
         """
         Add a custom regex pattern for matching.
         
@@ -175,7 +175,7 @@ class CompetitorFilter:
         Returns:
             True if pattern was added successfully, False if compilation failed
         """
-        regex_pattern = {
+        regex_pattern: Dict[str, Any] = {
             'pattern': pattern
         }
         
@@ -186,7 +186,8 @@ class CompetitorFilter:
             regex_pattern['description'] = description
             
         try:
-            regex_pattern['compiled'] = re.compile(pattern, re.IGNORECASE)
+            compiled_pattern = re.compile(pattern, re.IGNORECASE)
+            regex_pattern['compiled'] = compiled_pattern
             self.regex_patterns.append(regex_pattern)
             return True
         except re.error as e:
@@ -359,7 +360,7 @@ class CompetitorFilter:
         
         for pattern in self.regex_patterns:
             if 'compiled' in pattern:
-                regex = pattern['compiled']
+                regex = cast(Pattern[str], pattern['compiled'])
                 matches = list(regex.finditer(text))
                 
                 if matches:
@@ -401,7 +402,13 @@ class CompetitorFilter:
         }
         
         # Check if any matches were found
-        total_matches = sum(len(results[key]) for key in ['competitors', 'banned_code', 'banned_topics', 'banned_substrings', 'regex_patterns'])
+        categories = ['competitors', 'banned_code', 'banned_topics', 'banned_substrings', 'regex_patterns']
+        total_matches = 0
+        for key in categories:
+            category_results = results.get(key) # Use .get() for safety
+            if isinstance(category_results, list):
+                total_matches += len(category_results) # Now len() is called on a variable known to be a list
+
         results['has_matches'] = total_matches > 0
         results['total_matches'] = total_matches
         

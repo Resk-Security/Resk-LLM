@@ -8,7 +8,7 @@ import os
 import logging
 from typing import Dict, List, Optional, Set, Union, Tuple, Any
 from pathlib import Path
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast # type: ignore [import-untyped]
 
 # Importer depuis filtering_patterns au lieu des fichiers directs
 from resk_llm.filtering_patterns.special_tokens import OPENAI_SPECIAL_TOKENS, CONTROL_CHARS

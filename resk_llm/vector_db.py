@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-from typing import List, Dict, Optional, Tuple, Any, Union
+from typing import List, Dict, Optional, Tuple, Any, Union, TypeVar, cast, Collection
 import os
 import json
 import time
@@ -25,13 +25,13 @@ class VectorDatabase:
         self.similarity_threshold = similarity_threshold
         
         # In-memory storage
-        self.embeddings = []  # List of numpy arrays
-        self.metadata = []    # List of dictionaries with metadata
+        self.embeddings: List[np.ndarray] = []  # List of numpy arrays
+        self.metadata: List[Dict[str, Any]] = []    # List of dictionaries with metadata
         
         # External DB connector (initialized as None, set up with connect_external_db)
-        self.external_db = None
-        self.external_db_type = None
-        self.external_db_client = None  # For some DBs that need separate client and collection
+        self.external_db: Any = None
+        self.external_db_type: Optional[str] = None
+        self.external_db_client: Any = None  # For some DBs that need separate client and collection
         
         # Counters for statistics
         self.total_queries = 0
@@ -53,7 +53,7 @@ class VectorDatabase:
             # FAISS (local, file-based)
             if db_type.lower() == 'faiss':
                 try:
-                    import faiss
+                    import faiss  # type: ignore [import-not-found]
                     
                     # For FAISS, we need to create an index
                     if 'index_type' in connection_params:
@@ -86,7 +86,7 @@ class VectorDatabase:
             # Pinecone (cloud-based)
             elif db_type.lower() == 'pinecone':
                 try:
-                    import pinecone
+                    import pinecone  # type: ignore [import-untyped]
                     
                     # For Pinecone, we need API key and environment
                     if 'api_key' not in connection_params or 'environment' not in connection_params or 'index_name' not in connection_params:
@@ -121,7 +121,7 @@ class VectorDatabase:
             # Milvus (self-hosted or cloud)
             elif db_type.lower() == 'milvus':
                 try:
-                    from pymilvus import connections, Collection, utility
+                    from pymilvus import connections, Collection, utility  # type: ignore [import-untyped]
                     
                     # For Milvus, we need host, port, and collection name
                     if 'host' not in connection_params or 'port' not in connection_params or 'collection_name' not in connection_params:
@@ -137,8 +137,9 @@ class VectorDatabase:
                     
                     # Check if collection exists
                     if utility.has_collection(collection_name):
-                        self.external_db = Collection(name=collection_name)
-                        self.external_db.load()
+                        collection = Collection(name=collection_name)
+                        collection.load()
+                        self.external_db = collection
                     else:
                         self.logger.error(f"Milvus collection {collection_name} does not exist. Please create it first.")
                         return False
@@ -161,13 +162,13 @@ class VectorDatabase:
                     if 'url' in connection_params:
                         url = connection_params['url']
                         api_key = connection_params.get('api_key', None)
-                        client = QdrantClient(url=url, api_key=api_key)
+                        qdrant_client = QdrantClient(url=url, api_key=api_key)
                     elif 'path' in connection_params:
                         path = connection_params['path']
-                        client = QdrantClient(path=path)
+                        qdrant_client = QdrantClient(path=path)
                     else:
                         # Default to localhost
-                        client = QdrantClient(host="localhost", port=6333)
+                        qdrant_client = QdrantClient(host="localhost", port=6333)
                     
                     # Get collection name
                     if 'collection_name' not in connection_params:
@@ -176,12 +177,12 @@ class VectorDatabase:
                     
                     collection_name = connection_params['collection_name']
                     
-                    # Get or create collection
-                    collections = client.get_collections().collections
-                    collection_exists = any(c.name == collection_name for c in collections)
+                    # Get or create collection using list_collections
+                    collections_list = qdrant_client.get_collections().collections
+                    collection_exists = any(c.name == collection_name for c in collections_list)
                     
                     if not collection_exists and connection_params.get('create_if_not_exists', False):
-                        client.create_collection(
+                        qdrant_client.create_collection(
                             collection_name=collection_name,
                             vectors_config=VectorParams(
                                 size=self.embedding_dim,
@@ -192,8 +193,8 @@ class VectorDatabase:
                         self.logger.error(f"Qdrant collection {collection_name} does not exist. Set create_if_not_exists=True to create it.")
                         return False
                     
-                    self.external_db_client = client
-                    self.external_db = collection_name  # Store collection name
+                    self.external_db_client = qdrant_client
+                    self.external_db = collection_name  # Store collection name as string
                     self.external_db_type = 'qdrant'
                     self.logger.info(f"Connected to Qdrant collection: {collection_name}")
                     return True
@@ -205,7 +206,8 @@ class VectorDatabase:
             # Weaviate (self-hosted or cloud)
             elif db_type.lower() == 'weaviate':
                 try:
-                    import weaviate
+                    import weaviate  # type: ignore [import-not-found]
+                    from weaviate.client import Client as WeaviateClient  # type: ignore [import-not-found]
                     
                     # For Weaviate, we need URL and optionally API key
                     if 'url' not in connection_params:
@@ -221,7 +223,7 @@ class VectorDatabase:
                         auth_config = weaviate.auth.AuthApiKey(api_key=api_key)
                     
                     # Connect to Weaviate
-                    client = weaviate.Client(url=url, auth_client_secret=auth_config)
+                    weaviate_client = weaviate.Client(url=url, auth_client_secret=auth_config)
                     
                     # Get class name
                     if 'class_name' not in connection_params:
@@ -231,7 +233,15 @@ class VectorDatabase:
                     class_name = connection_params['class_name']
                     
                     # Check if class exists and create if needed
-                    if not client.schema.exists(class_name) and connection_params.get('create_if_not_exists', False):
+                    class_exists = False
+                    try:
+                        schema = weaviate_client.schema.get()
+                        classes = schema.get('classes', [])
+                        class_exists = any(c.get('class') == class_name for c in classes)
+                    except Exception as e:
+                        self.logger.warning(f"Error checking Weaviate schema: {str(e)}")
+                        
+                    if not class_exists and connection_params.get('create_if_not_exists', False):
                         class_obj = {
                             "class": class_name,
                             "vectorizer": "none",  # We'll provide vectors manually
@@ -246,12 +256,17 @@ class VectorDatabase:
                                 }
                             ]
                         }
-                        client.schema.create_class(class_obj)
-                    elif not client.schema.exists(class_name):
+                        try:
+                            weaviate_client.schema.create_class(class_obj)
+                            class_exists = True
+                        except Exception as e:
+                            self.logger.error(f"Error creating Weaviate class: {str(e)}")
+                            return False
+                    elif not class_exists:
                         self.logger.error(f"Weaviate class {class_name} does not exist. Set create_if_not_exists=True to create it.")
                         return False
                     
-                    self.external_db = client
+                    self.external_db = weaviate_client
                     self.external_db_type = 'weaviate'
                     self.external_db_client = class_name  # Store class name
                     self.logger.info(f"Connected to Weaviate class: {class_name}")
@@ -287,8 +302,9 @@ class VectorDatabase:
                     
                     # Get or create collection
                     try:
+                        # Check if we need embedding function
                         collection = client.get_collection(name=collection_name)
-                    except:
+                    except Exception:
                         if connection_params.get('create_if_not_exists', False):
                             collection = client.create_collection(name=collection_name)
                         else:
@@ -330,7 +346,7 @@ class VectorDatabase:
             return vec
         return vec / norm
         
-    def add_embedding(self, embedding: np.ndarray, metadata: Dict[str, Any] = None) -> bool:
+    def add_embedding(self, embedding: np.ndarray, metadata: Optional[Dict[str, Any]] = None) -> bool:
         """
         Add an embedding to the database with optional metadata.
         
@@ -389,12 +405,18 @@ class VectorDatabase:
                 elif self.external_db_type == 'milvus':
                     # Milvus requires a unique ID and specific format
                     vector_id = metadata.get('id', len(self.embeddings)-1)
+                    vector_id_int = 0
                     if isinstance(vector_id, str) and vector_id.isdigit():
-                        vector_id = int(vector_id)
+                        vector_id_int = int(vector_id)
+                    elif isinstance(vector_id, int):
+                        vector_id_int = vector_id
+                    else:
+                        # If the ID can't be converted to an integer, use a hash
+                        vector_id_int = hash(str(vector_id)) % (2**31)
                     
                     # Prepare data
                     data = [
-                        [vector_id],  # pk
+                        [vector_id_int],  # pk
                         [embedding_np.tolist()],  # vector
                         [json.dumps(metadata)]  # metadata as JSON
                     ]
@@ -405,19 +427,21 @@ class VectorDatabase:
                 elif self.external_db_type == 'qdrant':
                     # Qdrant needs client and collection name
                     client = self.external_db_client
-                    collection_name = self.external_db
+                    collection_name = cast(str, self.external_db)
                     
                     # Generate ID
                     vector_id = metadata.get('id', f"vec_{len(self.embeddings)-1}")
                     if isinstance(vector_id, int):
-                        vector_id = str(vector_id)
+                        vector_id_str = str(vector_id)
+                    else:
+                        vector_id_str = str(vector_id)
                     
                     # Add point
                     client.upsert(
                         collection_name=collection_name,
                         points=[
                             {
-                                "id": vector_id,
+                                "id": vector_id_str,
                                 "vector": embedding_np.tolist(),
                                 "payload": metadata
                             }
@@ -427,7 +451,7 @@ class VectorDatabase:
                 elif self.external_db_type == 'weaviate':
                     # Weaviate client and class name
                     client = self.external_db
-                    class_name = self.external_db_client
+                    class_name = cast(str, self.external_db_client)
                     
                     # Generate ID (Weaviate uses UUIDs)
                     import uuid
@@ -454,13 +478,15 @@ class VectorDatabase:
                     # Generate ID
                     vector_id = metadata.get('id', f"vec_{len(self.embeddings)-1}")
                     if isinstance(vector_id, int):
-                        vector_id = str(vector_id)
+                        vector_id_str = str(vector_id)
+                    else:
+                        vector_id_str = str(vector_id)
                     
                     # Add document
                     collection.add(
                         embeddings=[embedding_np.tolist()],
                         metadatas=[metadata],
-                        ids=[vector_id],
+                        ids=[vector_id_str],
                         documents=[metadata.get("text_preview", "")]
                     )
             
@@ -492,7 +518,7 @@ class VectorDatabase:
             # Ensure embedding is a numpy array
             query_embedding_np = np.array(query_embedding, dtype=np.float32)
             
-            results = []
+            results: List[Dict[str, Any]] = []
             
             # If using external DB
             if self.external_db is not None:
@@ -564,7 +590,7 @@ class VectorDatabase:
                 elif self.external_db_type == 'qdrant':
                     # Search in Qdrant
                     client = self.external_db_client
-                    collection_name = self.external_db
+                    collection_name = cast(str, self.external_db)
                     
                     # Query
                     search_results = client.search(
@@ -587,7 +613,7 @@ class VectorDatabase:
                 elif self.external_db_type == 'weaviate':
                     # Search in Weaviate
                     client = self.external_db
-                    class_name = self.external_db_client
+                    class_name = cast(str, self.external_db_client)
                     
                     # Query
                     results_raw = (
@@ -656,29 +682,50 @@ class VectorDatabase:
                         })
                 
                 # Sort by similarity (highest first)
-                in_memory_results.sort(key=lambda x: x['similarity'], reverse=True)
+                in_memory_results.sort(key=lambda x: float(x['similarity']), reverse=True)
                 
                 # Add top results that aren't already in the results list
-                existing_ids = {r['metadata'].get('id') for r in results}
+                existing_ids = set()
+                for r in results:
+                    if isinstance(r, dict) and 'metadata' in r and isinstance(r['metadata'], dict) and 'id' in r['metadata']:
+                        existing_ids.add(r['metadata']['id'])
+                        
                 for result in in_memory_results[:top_k]:
-                    if result['metadata'].get('id') not in existing_ids:
+                    meta_id = None
+                    if isinstance(result, dict) and 'metadata' in result and isinstance(result['metadata'], dict) and 'id' in result['metadata']:
+                        meta_id = result['metadata']['id']
+                        
+                    if meta_id is not None and meta_id not in existing_ids:
                         results.append(result)
                         self.total_matches += 1
-                        existing_ids.add(result['metadata'].get('id'))
+                        existing_ids.add(meta_id)
                         
                         # Stop if we've reached top_k
                         if len(results) >= top_k:
                             break
             
-            # Sort final results
-            results.sort(key=lambda x: x['similarity'], reverse=True)
+            # Helper function for safe sorting key
+            def get_similarity_score(item: Dict[str, Any]) -> float:
+                similarity = item.get('similarity')
+                if isinstance(similarity, (int, float)):
+                    return float(similarity)
+                # Handle potential non-numeric types safely
+                try:
+                    # We add an ignore here because similarity could still be non-floatable
+                    return float(similarity) # type: ignore [arg-type]
+                except (ValueError, TypeError):
+                    return 0.0
+
+            # Sort final results using the helper function
+            results.sort(key=get_similarity_score, reverse=True)
+
             return results[:top_k]
             
         except Exception as e:
             self.logger.error(f"Error searching database: {str(e)}")
             return []
     
-    def is_similar_to_known_attack(self, query_embedding: np.ndarray, threshold: float = None) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    def is_similar_to_known_attack(self, query_embedding: np.ndarray, threshold: Optional[float] = None) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
         Check if the query embedding is similar to any known attack.
         

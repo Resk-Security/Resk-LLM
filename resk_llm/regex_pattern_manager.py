@@ -2,7 +2,7 @@ import re
 import json
 import os
 import logging
-from typing import Dict, List, Any, Tuple, Set, Optional, Union
+from typing import Dict, List, Any, Tuple, Set, Optional, Union, Pattern, Mapping, cast, Sequence, MutableSequence
 from pathlib import Path
 
 class RegexPatternManager:
@@ -39,9 +39,9 @@ class RegexPatternManager:
         
         # Load any existing patterns from the directory
         if patterns_dir:
-            self.load_patterns_from_directory(patterns_dir)
+            self.load_all_categories(patterns_dir)
     
-    def load_patterns_from_directory(self, directory: str) -> bool:
+    def load_all_categories(self, directory: str) -> bool:
         """
         Load all pattern files from a directory.
         
@@ -190,9 +190,9 @@ class RegexPatternManager:
         
         return flags
     
-    def add_pattern(self, pattern: str, category: str, name: str = None, 
-                   description: str = None, flags: List[str] = None, 
-                   severity: str = "medium", tags: List[str] = None) -> bool:
+    def add_pattern(self, pattern: str, category: str, name: Optional[str] = None, 
+                   description: Optional[str] = None, flags: Optional[List[str]] = None, 
+                   severity: str = "medium", tags: Optional[List[str]] = None) -> bool:
         """
         Add a new regex pattern.
         
@@ -222,7 +222,7 @@ class RegexPatternManager:
             severity = "medium"
         
         # Create pattern data
-        pattern_data = {
+        pattern_data: Dict[str, Any] = {
             'pattern': pattern,
             'category': category,
             'severity': severity
@@ -247,10 +247,10 @@ class RegexPatternManager:
             # Compile the pattern
             try:
                 flags_int = self._parse_regex_flags(flags or [])
-                compiled = re.compile(pattern, flags_int)
+                compiled_pattern = re.compile(pattern, flags_int)
                 
-                compiled_entry = pattern_data.copy()
-                compiled_entry['compiled'] = compiled
+                compiled_entry: Dict[str, Any] = pattern_data.copy()
+                compiled_entry['compiled'] = compiled_pattern
                 self.compiled_patterns[category].append(compiled_entry)
                 
                 # Save the updated patterns if we have a directory
@@ -285,14 +285,17 @@ class RegexPatternManager:
         try:
             file_path = os.path.join(self.patterns_dir, f"{category}.json")
             
+            # Initialize the patterns list with a type hint
+            patterns_list: List[Dict[str, Any]] = []
+
             # Create the export data
-            data = {
+            data: Dict[str, Any] = {
                 'metadata': {
                     'name': category,
                     'description': self.categories[category].get('description', f"Patterns for {category}"),
                     'pattern_count': len(self.patterns[category])
                 },
-                'patterns': []
+                'patterns': patterns_list # Use the initialized list
             }
             
             # Include any additional metadata
@@ -304,13 +307,14 @@ class RegexPatternManager:
             for pattern in self.patterns[category]:
                 pattern_copy = pattern.copy()
                 pattern_copy.pop('category', None)  # Category is implicit in the file
-                data['patterns'].append(pattern_copy)
+                # Append to the typed list
+                patterns_list.append(pattern_copy)
             
             # Write to file
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
                 
-            self.categories[category]['file_path'] = file_path
+            self.categories[category]['file_path'] = file_path # type: ignore[index]
             return True
         except Exception as e:
             self.logger.error(f"Error saving category {category}: {str(e)}")
@@ -334,7 +338,7 @@ class RegexPatternManager:
         
         return all_saved
     
-    def create_category(self, category: str, description: str = None, metadata: Dict[str, Any] = None) -> bool:
+    def create_category(self, category: str, description: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> bool:
         """
         Create a new pattern category.
         
@@ -361,7 +365,7 @@ class RegexPatternManager:
         
         return True
     
-    def match_text(self, text: str, categories: List[str] = None) -> List[Dict[str, Any]]:
+    def match_text(self, text: str, categories: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Match text against the regex patterns.
         
@@ -372,7 +376,7 @@ class RegexPatternManager:
         Returns:
             List of dictionaries with match details
         """
-        matches = []
+        matches: List[Dict[str, Any]] = []
         
         # Determine which categories to check
         cats_to_check = categories if categories else list(self.compiled_patterns.keys())
@@ -381,11 +385,14 @@ class RegexPatternManager:
         for category in cats_to_check:
             if category in self.compiled_patterns:
                 for pattern_data in self.compiled_patterns[category]:
-                    compiled = pattern_data['compiled']
-                    pattern_matches = list(compiled.finditer(text))
+                    compiled_pattern = pattern_data.get('compiled')
+                    if not isinstance(compiled_pattern, Pattern):
+                        continue
+                        
+                    pattern_matches = list(compiled_pattern.finditer(text))
                     
                     if pattern_matches:
-                        match_data = {
+                        match_data: Dict[str, Any] = {
                             'category': category,
                             'pattern': pattern_data['pattern'],
                             'severity': pattern_data.get('severity', 'medium'),
@@ -412,7 +419,7 @@ class RegexPatternManager:
         
         return matches
     
-    def filter_text(self, text: str, categories: List[str] = None, 
+    def filter_text(self, text: str, categories: Optional[List[str]] = None, 
                    replacement: str = "[FILTERED]", min_severity: str = "low") -> Tuple[str, List[Dict[str, Any]]]:
         """
         Filter text by replacing matches with a replacement string.
@@ -434,7 +441,7 @@ class RegexPatternManager:
         min_level = severity_levels.get(min_severity.lower(), 1)
         
         # Track all positions to replace
-        all_positions = []
+        all_positions: List[Tuple[int, int]] = []
         
         # Gather positions from matches with sufficient severity
         for match in matches:
@@ -492,9 +499,22 @@ class RegexPatternManager:
         pattern = pattern_data['pattern']
         name = pattern_data.get('name')
         description = pattern_data.get('description')
-        flags = pattern_data.get('flags', [])
+        
+        # Ensure flags is a list of strings
+        flags: List[str] = []
+        flags_data = pattern_data.get('flags')
+        if isinstance(flags_data, list):
+            # Convert all items to strings if they're not already
+            flags = [str(flag) for flag in flags_data if flag is not None]
+        
         severity = pattern_data.get('severity', 'medium')
-        tags = pattern_data.get('tags', [])
+        
+        # Ensure tags is a list of strings
+        tags: List[str] = []
+        tags_data = pattern_data.get('tags')
+        if isinstance(tags_data, list):
+            # Convert all items to strings if they're not already
+            tags = [str(tag) for tag in tags_data if tag is not None]
         
         return self.add_pattern(
             pattern=pattern,

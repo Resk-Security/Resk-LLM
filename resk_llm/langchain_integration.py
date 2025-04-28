@@ -4,7 +4,10 @@ import logging
 from typing import Any, Dict, List, Optional, Union, Callable
 import traceback
 
-from resk_llm.openai_protector import OpenAIProtector
+from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables.base import Runnable
+
+from resk_llm.openai_protector import OpenAIProtector # type: ignore [import-untyped]
 from resk_llm.resk_context_manager import TokenBasedContextManager
 from resk_llm.resk_models import RESK_MODELS
 

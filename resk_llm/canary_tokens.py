@@ -26,8 +26,8 @@ class CanaryTokenManager:
         self.use_uuid = use_uuid
         
         # Track active tokens and their context
-        self.active_tokens = {}  # Dict[token_id, token_data]
-        self.leaked_tokens = {}  # Dict[token_id, leak_data]
+        self.active_tokens: Dict[str, Dict[str, Any]] = {}  # Dict[token_id, token_data]
+        self.leaked_tokens: Dict[str, Dict[str, Any]] = {}  # Dict[token_id, leak_data]
         
         # Configure token format
         self.token_prefix = "CT"
@@ -50,7 +50,7 @@ class CanaryTokenManager:
         uuid_str = str(uuid.uuid4()).split('-')[0]
         return f"{self.token_prefix}{uuid_str}{self.token_suffix}"
     
-    def generate_token(self, context_info: Dict[str, Any] = None) -> str:
+    def generate_token(self, context_info: Optional[Dict[str, Any]] = None) -> str:
         """
         Generate a new canary token and register it.
         
@@ -80,7 +80,7 @@ class CanaryTokenManager:
         self.tokens_generated += 1
         return token
     
-    def insert_canary_token(self, text: str, context_info: Dict[str, Any] = None) -> Tuple[str, str]:
+    def insert_canary_token(self, text: str, context_info: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
         """
         Insert a canary token into the text.
         
