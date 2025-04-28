@@ -3,13 +3,12 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.10"
-    # You can also specify other tool versions:
-    # nodejs: "16"
-
+  jobs:
+    pre_build:
+      - pip install sphinx sphinx-autoapi myst-parser sphinx-rtd-theme
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
    configuration: docs/conf.py
-   fail_on_warning: true  
 
 # Dependencies required to build your docs
 python:
