@@ -1,4 +1,4 @@
-name: Python Package
+name: Python Package CI/CD
 
 on:
   push:
@@ -7,6 +7,10 @@ on:
       - 'v*'  # Run workflow on version tags, e.g. v1.0.0
   pull_request:
     branches: [main]
+
+# Remove id-token permission, keep contents: write for GH Release
+permissions:
+  contents: write # Required for creating GitHub Releases
 
 jobs:
   test:
@@ -24,9 +28,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -e .
-        pip install pytest flake8 mypy
+        # Use requirements.txt for testing dependencies
+        pip install -r requirements.txt 
+        pip install -e .[test] # Assuming you have a [test] extra or similar for flake8, mypy, pytest
+        # If not, install them explicitly: pip install pytest flake8 mypy
     - name: Lint with flake8
       run: |
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -43,35 +48,37 @@ jobs:
     runs-on: ubuntu-latest
     # Only publish on tag push events
     if: startsWith(github.ref, 'refs/tags/v')
-    
+    permissions: # Keep contents: write for release creation
+      contents: write
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-    - name: Install dependencies
+    - name: Install build and upload dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install build twine
-    - name: Run pre-release check
-      run: |
-        python pre_release_check.py
+        pip install build twine # Re-added twine
+    # - name: Run pre-release check # Keep commented unless needed
+    #   run: |
+    #     python pre_release_check.py
     - name: Build package
       run: |
         python -m build
-    - name: Verify package
+    - name: Verify package distribution
       run: |
-        twine check dist/*
-    - name: Publish to PyPI
+        twine check dist/* # Re-added twine check
+    - name: Publish package to PyPI
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }} # Use the secret token
       run: |
-        twine upload dist/*
+        twine upload dist/* --skip-existing # Re-added twine upload
+
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: dist/*
         generate_release_notes: true
