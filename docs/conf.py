@@ -31,6 +31,7 @@ extensions = [
     'sphinx.ext.viewcode', # Add links to source code
     'myst_parser', # Enable parsing Markdown files
     'sphinx_autoapi.extension', # Auto-generate API docs from code
+    "autoapi.extension"
 ]
 
 templates_path = ['_templates']
