@@ -682,7 +682,14 @@ class VectorDatabase:
                         })
                 
                 # Sort by similarity (highest first)
-                in_memory_results.sort(key=lambda x: float(x['similarity']), reverse=True)
+                # Use a safer key function for sorting to help mypy
+                def safe_float_key(item: Dict[str, Any]) -> float:
+                    sim = item.get('similarity', 0.0)
+                    try:
+                        return float(sim)
+                    except (ValueError, TypeError):
+                        return 0.0
+                in_memory_results.sort(key=safe_float_key, reverse=True)
                 
                 # Add top results that aren't already in the results list
                 existing_ids = set()
@@ -707,14 +714,19 @@ class VectorDatabase:
             # Helper function for safe sorting key
             def get_similarity_score(item: Dict[str, Any]) -> float:
                 similarity = item.get('similarity')
+
                 if isinstance(similarity, (int, float)):
                     return float(similarity)
-                # Handle potential non-numeric types safely
-                try:
-                    # We add an ignore here because similarity could still be non-floatable
-                    return float(similarity) # type: ignore [arg-type]
-                except (ValueError, TypeError):
-                    return 0.0
+                elif isinstance(similarity, str):
+                    try:
+                        # Attempt to convert if it's a string
+                        # Cast to str to satisfy mypy after isinstance check
+                        return float(cast(str, similarity)) 
+                    except ValueError:
+                        # String is not a valid float representation
+                        return 0.0
+                # For any other type (including None or types that don't support float), return 0.0
+                return 0.0
 
             # Sort final results using the helper function
             results.sort(key=get_similarity_score, reverse=True)
