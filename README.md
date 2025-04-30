@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/pypi/l/resk-llm.svg)](https://github.com/ReskLLM/Resk-LLM/blob/main/LICENSE)
 [![Downloads](https://static.pepy.tech/badge/resk-llm)](https://pepy.tech/project/resk-llm)
 [![GitHub issues](https://img.shields.io/github/issues/ReskLLM/Resk-LLM.svg)](https://github.com/ReskLLM/Resk-LLM/issues)
-[![GitHub stars](https://img.shields.io/github/stars/ReskLLM/Resk-LLM.svg)](https://github.com/ReskLLM/Resk-LLM/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/ReskLLM/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/stargazers)
 [![Documentation Status](https://readthedocs.org/projects/resk-llm/badge/?version=latest)](https://resk-llm.readthedocs.io/en/latest/?badge=latest)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
