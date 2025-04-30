@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.1] - 2024-09-24 # Placeholder Date - Please Update!
+
+### Changed
+
+- Refactored `examples/openai_example.py` to use `OpenAIProtector` class and `execute_protected` method instead of the deprecated `create_openai_protector` function and `protect_client`.
+- Refactored `examples/async_example.py` to align with `OpenAIProtector` usage, remove `PatternManager`, and use `execute_protected`.
+- Updated code examples in `README.md` (Quick Start, Integrated Security Manager) to use `OpenAIProtector` and `execute_protected`.
+- Emphasized open-source nature and ease of security integration in `README.md`.
+
+### Added
+
+- Added a "Use Cases" section to `README.md`.
+
+### Fixed
+
+- Corrected import paths for `OpenAIProtector` in `examples/openai_example.py` and `examples/async_example.py`.
+- Removed duplicate "Sources and Research Papers" section and redundant "Academic Research" section from `README.md`.
+- Corrected structure and ordering of sections in `README.md`.
+
+### Removed
+
+- Removed usage of deprecated `create_openai_protector` function in examples and README.
+- Removed direct usage of `PatternManager` in `examples/async_example.py`, relying on `OpenAIProtector` configuration instead.
+
 ## [0.3.0] - 2024-09-24
 
 ### New Features
@@ -62,6 +86,7 @@
 - Renamed `SecureTokenizer` to `ReskProtectorTokenizer`
 - Updated library version to 0.3.0
 - Changed import structure in `__init__.py`
+- Renamed the response key from `canary_leaks` to `canary_tokens_leaked` in `PromptSecurityManager.check_response` for clarity.
 
 ## [0.2.5] - Previous Release
 
