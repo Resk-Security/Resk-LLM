@@ -124,7 +124,7 @@ async def run_openai_calls():
 # Run the async function
 if __name__ == "__main__": # Example of how to run this
     asyncio.run(run_openai_calls())
-
+```
 ## Examples
 
 Explore various use cases and integration patterns in the `/examples` directory:
