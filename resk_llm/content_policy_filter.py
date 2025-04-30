@@ -1,5 +1,4 @@
 # resk_llm/content_policy_filter.py
-# (Replaces competitor_filter.py)
 
 import logging
 import re

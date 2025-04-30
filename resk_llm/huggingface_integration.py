@@ -368,7 +368,7 @@ class MultiModalProtector(ProtectorBase[Union[str, Image.Image, Dict[str, Any]],
             # Pass through unknown types
             return response
 
-    def protect(self, data: Union[str, Image.Image, Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+    def protect(self, data: Union[str, Image.Image, Dict[str, Any]]) -> Union[str, Image.Image, Dict[str, Any]]:
         """
         Main protection method required by ProtectorBase.
         Provides appropriate protection based on input type.

@@ -203,7 +203,13 @@ class LangChainProtector(ProtectorBase[Union[BasePromptTemplate, Chain, BaseMess
                     protected_list_content.append(item_copy)
                 else:
                     # Non-text content, pass through unchanged
-                    protected_list_content.append(item)
+                    # Ensure only dicts are appended to maintain list type
+                    if isinstance(item, dict):
+                        protected_list_content.append(item)
+                    else:
+                        logger.warning(f"Skipping non-dict item in multi-modal content: {type(item)}")
+                        # Optionally append a placeholder or the original item if the list type allows Any
+                        # protected_list_content.append(item) # If list type were List[Any]
             
             # Create a new message with protected content
             message_copy = message.copy()
@@ -244,13 +250,15 @@ class LangChainProtector(ProtectorBase[Union[BasePromptTemplate, Chain, BaseMess
             # This is tricky since PromptValue is an interface
             # As a workaround, we'll modify the to_string method
             original_to_string = prompt_value.to_string
-            prompt_value.to_string = lambda: protected_string
+            # Ignore type error for dynamic method assignment
+            prompt_value.to_string = lambda: protected_string # type: ignore [method-assign]
             
             return prompt_value
         
         # Replace the methods with protected versions
-        template.format = protected_format
-        template.format_prompt = protected_format_prompt
+        # Ignore type errors for dynamic method assignment (monkey-patching)
+        template.format = protected_format # type: ignore [method-assign]
+        template.format_prompt = protected_format_prompt # type: ignore [method-assign]
         
         return template
     
@@ -309,7 +317,8 @@ class LangChainProtector(ProtectorBase[Union[BasePromptTemplate, Chain, BaseMess
                 return original_result
         
         # Replace the original __call__ method with the protected version
-        chain.__call__ = protected_call
+        # Ignore type error for dynamic method assignment (monkey-patching)
+        chain.__call__ = protected_call # type: ignore [method-assign]
             
         return chain
     
