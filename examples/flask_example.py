@@ -113,14 +113,14 @@ def generate_embeddings():
         )
         
         # Return the embeddings
-    return jsonify({
+        return jsonify({
             "success": True,
             "embeddings": response.data[0].embedding
         })
     
     except Exception as e:
         # Return error response
-    return jsonify({
+        return jsonify({
             "success": False,
             "error": str(e)
         }), 400
