@@ -402,8 +402,8 @@ class TestPromptSecurityManager(unittest.TestCase):
             response_with_leak, associated_tokens=[token]
         )
         
-        self.assertIn('canary_leaks', result, "Result should contain canary_leaks key")
-        self.assertTrue(len(result['canary_leaks']) > 0, "Leaked tokens should be provided")
+        self.assertIn('canary_tokens_leaked', result, "Result should contain canary_tokens_leaked key")
+        self.assertTrue(len(result['canary_tokens_leaked']) > 0, "Leaked tokens should be provided")
     
     def test_check_response_without_leak(self):
         """Test checking a response without a token leak."""
@@ -423,8 +423,8 @@ class TestPromptSecurityManager(unittest.TestCase):
             safe_response, associated_tokens=[token]
         )
         
-        self.assertIn('canary_leaks', result, "Result should contain canary_leaks key")
-        self.assertEqual(len(result['canary_leaks']), 0, "No leaked tokens should be provided")
+        self.assertIn('canary_tokens_leaked', result, "Result should contain canary_tokens_leaked key")
+        self.assertEqual(len(result['canary_tokens_leaked']), 0, "No leaked tokens should be provided")
     
     def test_statistics(self):
         """Test getting statistics from the security manager."""
