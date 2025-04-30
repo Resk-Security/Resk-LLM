@@ -6,37 +6,127 @@ import json
 import time
 from datetime import datetime
 
-class VectorDatabase:
+from resk_llm.core.abc import DetectorBase
+
+# Type definitions
+VectorDBConfig = Dict[str, Any]
+
+class VectorDatabase(DetectorBase[np.ndarray, VectorDBConfig]):
     """
     A vector database for storing and comparing embeddings of prompt injection attacks.
+    
     Supports both in-memory storage and optional integration with external vector databases.
+    This class provides methods for adding, searching, and comparing embeddings with
+    efficient similarity calculations.
+    
+    Implements DetectorBase for detecting similarity to known attack patterns.
     """
     
-    def __init__(self, embedding_dim: int = 1536, similarity_threshold: float = 0.85):
+    def __init__(self, embedding_dim: int = 1536, similarity_threshold: float = 0.85, config: Optional[VectorDBConfig] = None):
         """
         Initialize the vector database.
         
         Args:
             embedding_dim: Dimension of the embeddings to store
             similarity_threshold: Threshold above which two embeddings are considered similar
+            config: Additional configuration parameters
         """
+        merged_config: VectorDBConfig = config or {}
+        if 'embedding_dim' not in merged_config:
+            merged_config['embedding_dim'] = embedding_dim
+        if 'similarity_threshold' not in merged_config:
+            merged_config['similarity_threshold'] = similarity_threshold
+            
+        super().__init__(merged_config)
+        
+        self.embedding_dim = self.config['embedding_dim']
+        self.similarity_threshold = self.config['similarity_threshold']
         self.logger = logging.getLogger(__name__)
-        self.embedding_dim = embedding_dim
-        self.similarity_threshold = similarity_threshold
         
         # In-memory storage
         self.embeddings: List[np.ndarray] = []  # List of numpy arrays
-        self.metadata: List[Dict[str, Any]] = []    # List of dictionaries with metadata
+        self.metadata: List[Dict[str, Any]] = []  # List of dictionaries with metadata
         
         # External DB connector (initialized as None, set up with connect_external_db)
         self.external_db: Any = None
         self.external_db_type: Optional[str] = None
         self.external_db_client: Any = None  # For some DBs that need separate client and collection
         
+        # Processing flags
+        self.normalize_vectors: bool = False  # Set to True for cosine similarity in some backends
+        
         # Counters for statistics
         self.total_queries = 0
         self.total_matches = 0
         self.creation_time = datetime.now()
+    
+    def _validate_config(self) -> None:
+        """
+        Validate the configuration.
+        
+        Raises:
+            ValueError: If configuration is invalid
+        """
+        if 'embedding_dim' in self.config and not isinstance(self.config['embedding_dim'], int):
+            raise ValueError("embedding_dim must be an integer")
+            
+        if 'similarity_threshold' in self.config and not isinstance(self.config['similarity_threshold'], float):
+            raise ValueError("similarity_threshold must be a float")
+    
+    def update_config(self, config: VectorDBConfig) -> None:
+        """
+        Update the configuration with new values.
+        
+        Args:
+            config: New configuration values
+        """
+        self.config.update(config)
+        self._validate_config()
+        
+        # Update instance attributes
+        if 'embedding_dim' in config:
+            self.embedding_dim = config['embedding_dim']
+        
+        if 'similarity_threshold' in config:
+            self.similarity_threshold = config['similarity_threshold']
+
+    def detect(self, data: np.ndarray) -> Dict[str, Any]:
+        """
+        Detect if the provided embedding is similar to any known attacks.
+        
+        Args:
+            data: The embedding to check, as a numpy array
+            
+        Returns:
+            A dictionary containing detection results:
+            - detected: True if similarity exceeds threshold, False otherwise
+            - max_similarity: The highest similarity score found
+            - similar_entries: List of entries with similarity scores above threshold
+            - threshold: The similarity threshold used for detection
+        """
+        self.total_queries += 1
+        
+        # Search for similar vectors
+        similar_entries = self.search_similar(data, top_k=3)
+        
+        # Check if any similarity exceeds the threshold
+        detected = False
+        max_similarity = 0.0
+        
+        if similar_entries:
+            max_similarity = max(entry.get('similarity', 0.0) for entry in similar_entries)
+            detected = max_similarity >= self.similarity_threshold
+            
+            if detected:
+                self.total_matches += 1
+                self.logger.info(f"Detected similarity to known pattern: {max_similarity:.3f}")
+        
+        return {
+            'detected': detected,
+            'max_similarity': max_similarity,
+            'similar_entries': similar_entries,
+            'threshold': self.similarity_threshold
+        }
         
     def connect_external_db(self, db_type: str, **connection_params) -> bool:
         """
@@ -330,7 +420,16 @@ class VectorDatabase:
             return False
     
     def _cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
-        """Calculate cosine similarity between two vectors."""
+        """
+        Calculate cosine similarity between two vectors.
+        
+        Args:
+            vec1: First vector
+            vec2: Second vector
+            
+        Returns:
+            Cosine similarity score (0-1)
+        """
         norm1 = np.linalg.norm(vec1)
         norm2 = np.linalg.norm(vec2)
         
@@ -340,28 +439,36 @@ class VectorDatabase:
         return np.dot(vec1, vec2) / (norm1 * norm2)
     
     def _normalize_vector(self, vec: np.ndarray) -> np.ndarray:
-        """Normalize a vector to unit length."""
+        """
+        Normalize a vector to unit length.
+        
+        Args:
+            vec: Vector to normalize
+            
+        Returns:
+            Normalized vector
+        """
         norm = np.linalg.norm(vec)
         if norm == 0:
             return vec
         return vec / norm
         
-    def add_embedding(self, embedding: np.ndarray, metadata: Optional[Dict[str, Any]] = None) -> bool:
+    def add_entry(self, embedding: np.ndarray, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
-        Add an embedding to the database with optional metadata.
+        Add an embedding and its metadata to the vector database.
         
         Args:
             embedding: The embedding vector to add
-            metadata: Optional metadata associated with the embedding
+            metadata: Optional metadata to associate with the embedding
             
         Returns:
-            bool: True if the embedding was added successfully, False otherwise
+            String ID for the added entry
         """
         try:
             # Validate embedding dimension
             if len(embedding) != self.embedding_dim:
                 self.logger.error(f"Invalid embedding dimension: expected {self.embedding_dim}, got {len(embedding)}")
-                return False
+                return ""
                 
             # Ensure embedding is a numpy array
             embedding_np = np.array(embedding, dtype=np.float32)
@@ -490,19 +597,19 @@ class VectorDatabase:
                         documents=[metadata.get("text_preview", "")]
                     )
             
-            return True
+            return str(metadata['id'])
             
         except Exception as e:
             self.logger.error(f"Error adding embedding to database: {str(e)}")
-            return False
+            return ""
     
     def search_similar(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Dict[str, Any]]:
         """
-        Search for similar embeddings in the database.
+        Search for embeddings similar to the query embedding.
         
         Args:
             query_embedding: The embedding to search for
-            top_k: Number of most similar embeddings to return
+            top_k: Maximum number of results to return
             
         Returns:
             List of dictionaries containing similarity scores and metadata
@@ -737,29 +844,67 @@ class VectorDatabase:
             self.logger.error(f"Error searching database: {str(e)}")
             return []
     
-    def is_similar_to_known_attack(self, query_embedding: np.ndarray, threshold: Optional[float] = None) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    def get_size(self) -> int:
         """
-        Check if the query embedding is similar to any known attack.
+        Get the number of entries in the vector database.
         
-        Args:
-            query_embedding: The embedding to check
-            threshold: Optional override for similarity threshold
-            
         Returns:
-            Tuple of (is_similar, best_match_metadata)
+            Number of entries
         """
-        if threshold is None:
-            threshold = self.similarity_threshold
-            
-        results = self.search_similar(query_embedding, top_k=1)
+        if self.external_db_type is None:
+            return len(self.embeddings)
         
-        if results and results[0]['similarity'] >= threshold:
-            return True, results[0]
-        
-        return False, None
-    
+        # Handle external DB types
+        if self.external_db_type == 'faiss':
+             return self.external_db.ntotal if self.external_db else 0
+        elif self.external_db_type == 'pinecone':
+             # Pinecone index stats might need API call
+             try:
+                 stats = self.external_db.describe_index_stats()
+                 return stats.total_vector_count if stats else 0
+             except Exception as e:
+                 self.logger.error(f"Failed to get Pinecone index size: {e}")
+                 return 0 # Or handle error differently
+        elif self.external_db_type == 'milvus':
+             try:
+                 stats = self.external_db.get_collection_stats()
+                 return stats.row_count
+             except Exception as e:
+                 self.logger.error(f"Failed to get Milvus collection size: {e}")
+                 return 0
+        elif self.external_db_type == 'qdrant':
+             try:
+                 count = self.external_db.count(collection_name=self.config.get('qdrant_collection_name', 'resk_vectors')).count
+                 return count
+             except Exception as e:
+                 self.logger.error(f"Failed to get Qdrant collection size: {e}")
+                 return 0
+        elif self.external_db_type == 'weaviate':
+             try:
+                 # Weaviate counts might require a query
+                 result = self.external_db.query.aggregate(self.config.get('weaviate_class_name', 'VectorEntry')).with_meta_count().do()
+                 return result['data']['Aggregate'][self.config.get('weaviate_class_name', 'VectorEntry')][0]['meta']['count']
+             except Exception as e:
+                 self.logger.error(f"Failed to get Weaviate class size: {e}")
+                 return 0
+        elif self.external_db_type == 'chromadb':
+             try:
+                  return self.external_db.count()
+             except Exception as e:
+                  self.logger.error(f"Failed to get ChromaDB collection size: {e}")
+                  return 0
+        else:
+             # Fallback for unknown external DB or if connection failed
+             self.logger.warning(f"get_size not fully implemented for external DB type: {self.external_db_type}. Returning in-memory size.")
+             return len(self.embeddings) # Return in-memory size as fallback
+
     def get_statistics(self) -> Dict[str, Any]:
-        """Get statistics about the vector database."""
+        """
+        Get statistics about the vector database.
+        
+        Returns:
+            Dictionary containing statistics
+        """
         return {
             'embedding_count': len(self.embeddings),
             'total_queries': self.total_queries,
@@ -767,18 +912,19 @@ class VectorDatabase:
             'creation_time': self.creation_time.isoformat(),
             'uptime_seconds': (datetime.now() - self.creation_time).total_seconds(),
             'external_db_type': self.external_db_type,
-            'similarity_threshold': self.similarity_threshold
+            'similarity_threshold': self.similarity_threshold,
+            'embedding_dimension': self.embedding_dim
         }
         
     def save_to_disk(self, file_path: str) -> bool:
         """
-        Save the in-memory database to disk.
+        Save the vector database to disk.
         
         Args:
-            file_path: Path to save the database
+            file_path: Path to save the database to
             
         Returns:
-            bool: True if successful, False otherwise
+            True if successful, False otherwise
         """
         try:
             # Create directory if it doesn't exist
@@ -788,7 +934,8 @@ class VectorDatabase:
             data = {
                 'embeddings': [e.tolist() for e in self.embeddings],
                 'metadata': self.metadata,
-                'statistics': self.get_statistics()
+                'statistics': self.get_statistics(),
+                'config': self.config
             }
             
             with open(file_path, 'w') as f:
@@ -803,13 +950,13 @@ class VectorDatabase:
     
     def load_from_disk(self, file_path: str) -> bool:
         """
-        Load the database from disk.
+        Load the vector database from disk.
         
         Args:
             file_path: Path to load the database from
             
         Returns:
-            bool: True if successful, False otherwise
+            True if successful, False otherwise
         """
         try:
             if not os.path.exists(file_path):
@@ -822,6 +969,10 @@ class VectorDatabase:
             # Load embeddings and metadata
             self.embeddings = [np.array(e, dtype=np.float32) for e in data['embeddings']]
             self.metadata = data['metadata']
+            
+            # Update config if present
+            if 'config' in data:
+                self.update_config(data['config'])
             
             # Also add to external DB if connected
             if self.external_db is not None:
@@ -848,7 +999,7 @@ class VectorDatabase:
                 elif self.external_db_type in ['milvus', 'qdrant', 'weaviate', 'chromadb']:
                     # Add vectors one by one
                     for i, embedding in enumerate(self.embeddings):
-                        self.add_embedding(embedding, self.metadata[i])
+                        self.add_entry(embedding, self.metadata[i])
             
             self.logger.info(f"Loaded vector database from {file_path} with {len(self.embeddings)} embeddings")
             return True

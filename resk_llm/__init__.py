@@ -1,48 +1,85 @@
 """
-RESK-LLM: Une boîte à outils complète pour la sécurisation des agents LLM
+RESK-LLM: A Comprehensive Toolkit for Securing LLM Agents
 
-RESK-LLM fournit un ensemble de composants pour sécuriser les agents basés sur 
-des grands modèles de langage (LLM) contre diverses menaces, notamment:
+RESK-LLM provides a set of components to secure Large Language Model (LLM) based agents
+against various threats, including:
 
-- Les injections de prompts et tentatives de jailbreak
-- Les requêtes malveillantes et manipulations
-- La fuite d'informations sensibles ou personnelles
-- Les contenus toxiques et inappropriés
-- L'usurpation d'identité et l'obfuscation
-- Les attaques par similarité vectorielle
-- Les fuites de données via jetons canari
+- Prompt injections and jailbreak attempts
+- Malicious requests and manipulations
+- Leakage of sensitive or personal information (PII)
+- Toxic and inappropriate content
+- Identity spoofing and obfuscation
+- Vector similarity attacks
+- Data leakage via canary tokens
 
-Cette bibliothèque est spécialement conçue pour renforcer la sécurité des agents autonomes
-en fournissant des protections robustes pour leurs interactions avec les utilisateurs et systèmes.
+This library is specifically designed to enhance the security of autonomous agents
+by providing robust protections for their interactions with users and systems.
 """
 
 from .version import __version__
 
-# Core components
-from .resk_context_manager import TokenBasedContextManager
-from .tokenizer_protection import ReskWordsLists, CustomPatternManager
-from .filtering_patterns import check_pii_content, moderate_text, anonymize_text
+# --- Core Abstractions ---
+from .core.abc import (
+    SecurityComponent,
+    FilterBase,
+    DetectorBase,
+    ProtectorBase,
+    PatternProviderBase,
+    SecurityManagerBase
+)
+
+# --- Factory Functions ---
+from .factory import (
+    create_heuristic_filter,
+    create_text_analyzer,
+    create_canary_token_manager,
+    create_vector_database,
+    create_security_manager,
+    create_component
+)
+
+# --- LLM Provider Integrations ---
 from .providers_integration import OpenAIProtector, AnthropicProtector, CohereProtector
 
-# Advanced security components
-from .text_analysis import TextAnalyzer  
-from .competitor_filter import CompetitorFilter
+# --- Security Filters & Detectors ---
+from .heuristic_filter import HeuristicFilter 
+from .filtering_patterns import ( 
+    check_pii_content, moderate_text, anonymize_text,
+    check_text_for_injections, check_doxxing_attempt, analyze_toxicity, 
+    check_for_obfuscation, sanitize_text_from_obfuscation
+)
 from .url_detector import URLDetector
-from .ip_protection import IPProtection
-from .regex_pattern_manager import RegexPatternManager
+from .ip_detector import IPDetector
+from .content_policy_filter import ContentPolicyFilter
+from .core.canary_tokens import CanaryTokenDetector
+from .word_list_filter import WordListFilter
 
-# Existing security components
-from .heuristic_filter import HeuristicFilter
+# --- Pattern Management ---
+from .pattern_provider import FileSystemPatternProvider
+
+# --- Vector Database & Similarity ---
 from .vector_db import VectorDatabase
-from .canary_tokens import CanaryTokenManager, CanaryTokenDetector
+
+# --- Token & Context Management ---
+from .resk_context_manager import TokenBasedContextManager
+from .core.canary_tokens import CanaryTokenManager
+
+# --- Security Management ---
 from .prompt_security import PromptSecurityManager
 
-# Import framework integrations
-from resk_llm.flask_integration import FlaskProtector
-from resk_llm.fastapi_integration import FastAPIProtector
+# --- Text Analysis Utilities ---
+from .text_analysis import TextAnalyzer
+from .filtering_patterns import (
+    normalize_homoglyphs, remove_emojis, replace_emojis_with_description,
+    remove_zalgo, contains_zalgo
+)
 
-# Import agent security specific components
-from resk_llm.autonomous_agent_security import (
+# --- Framework Integrations ---
+from .flask_integration import FlaskProtector
+from .fastapi_integration import FastAPIProtector
+
+# --- Autonomous Agent Security ---
+from .autonomous_agent_security import (
     AgentSecurityManager,
     AgentPermission,
     AgentIdentity,
@@ -50,93 +87,78 @@ from resk_llm.autonomous_agent_security import (
     AGENT_DEFAULT_PERMISSIONS
 )
 
-# Import filtering patterns if available
-try:
-    from resk_llm.filtering_patterns import (
-        # Injection patterns
-        INJECTION_REGEX_PATTERNS,
-        INJECTION_KEYWORD_LISTS,
-        WORD_SEPARATION_PATTERNS,
-        KNOWN_JAILBREAK_PATTERNS,
-        check_text_for_injections,
-        
-        # PII patterns
-        PII_PATTERNS,
-        NAME_PATTERNS,
-        DOXXING_KEYWORDS,
-        DOXXING_CONTEXTS,
-        check_pii_content,
-        check_doxxing_attempt,
-        anonymize_text,
-        
-        # Toxicity patterns
-        TOXICITY_PATTERNS,
-        SUBTLE_TOXICITY_PATTERNS,
-        TOXICITY_KEYWORDS,
-        CONTEXTUAL_PATTERNS,
-        analyze_toxicity,
-        moderate_text,
-        
-        # Emoji and Unicode protection
-        EMOJI_PATTERN,
-        HOMOGLYPHS,
-        INVERSE_HOMOGLYPHS,
-        detect_emojis,
-        normalize_homoglyphs,
-        remove_emojis,
-        replace_emojis_with_description,
-        check_for_obfuscation,
-        sanitize_text_from_obfuscation,
-        contains_zalgo,
-        remove_zalgo,
-        
-        # Special tokens and characters
-        OPENAI_SPECIAL_TOKENS,
-        ANTHROPIC_SPECIAL_TOKENS,
-        LLAMA_SPECIAL_TOKENS,
-        MISTRAL_SPECIAL_TOKENS,
-        COHERE_SPECIAL_TOKENS,
-        ALL_SPECIAL_TOKENS,
-        CONTROL_CHARS,
-        SPECIAL_CHARS,
-        get_all_special_tokens,
-        get_model_special_tokens,
-        
-        # Listes de mots et patterns prohibés
-        RESK_WORDS_LIST,
-        RESK_PROHIBITED_PATTERNS_ENG,
-        RESK_PROHIBITED_PATTERNS_FR,
-        ALL_PROHIBITED_PATTERNS
-    )
-except ImportError:
-    pass
-
-# Define what's available in the public API
+# Define the public API (organized by category)
 __all__ = [
-    # Core functionality
-    'TokenBasedContextManager',
-    'ReskWordsLists',
-    'CustomPatternManager',
+    # Version
+    '__version__',
+
+    # Core Abstractions
+    'SecurityComponent',
+    'FilterBase',
+    'DetectorBase',
+    'ProtectorBase',
+    'PatternProviderBase',
+    'SecurityManagerBase',
+    
+    # Factory Functions
+    'create_heuristic_filter',
+    'create_text_analyzer',
+    'create_canary_token_manager',
+    'create_vector_database',
+    'create_security_manager',
+    'create_component',
+
+    # LLM Provider Protectors
     'OpenAIProtector',
     'AnthropicProtector',
     'CohereProtector',
-    
-    # Filtering and content moderation
-    'check_pii_content',
-    'moderate_text',
-    'anonymize_text',
-    
-    # Advanced security features
-    'TextAnalyzer',
-    'CompetitorFilter',
-    'URLDetector',
-    'IPProtection',
-    'RegexPatternManager',
-    
-    # Existing security components
+
+    # Security Filters & Detectors
     'HeuristicFilter',
-    'VectorDatabase',
-    'CanaryTokenManager',
+    'URLDetector',
+    'IPDetector',
+    'ContentPolicyFilter',
     'CanaryTokenDetector',
+    'WordListFilter',
+    # Functions (to be potentially wrapped in Filter/Detector classes later)
+    'check_pii_content', 
+    'moderate_text', 
+    'anonymize_text',
+    'check_text_for_injections', 
+    'check_doxxing_attempt', 
+    'analyze_toxicity',
+    'check_for_obfuscation', 
+    'sanitize_text_from_obfuscation',
+
+    # Pattern Management
+    'FileSystemPatternProvider',
+
+    # Vector Database & Similarity
+    'VectorDatabase',
+
+    # Token & Context Management
+    'TokenBasedContextManager',
+    'CanaryTokenManager',
+
+    # Security Management
     'PromptSecurityManager',
+
+    # Text Analysis & Utilities
+    'TextAnalyzer',
+    'normalize_homoglyphs', 
+    'remove_emojis', 
+    'replace_emojis_with_description',
+    'remove_zalgo',
+    'contains_zalgo',
+
+    # Framework Integrations
+    'FlaskProtector',
+    'FastAPIProtector',
+
+    # Autonomous Agent Security
+    'AgentSecurityManager',
+    'AgentPermission',
+    'AgentIdentity',
+    'SecureAgentExecutor',
+    'AGENT_DEFAULT_PERMISSIONS',
 ]

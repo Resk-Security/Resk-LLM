@@ -1,342 +1,519 @@
+"""
+Hugging Face integration module for securing LLM interactions.
+
+This module provides classes and utilities to secure Hugging Face models
+and transformers, implementing protection mechanisms for inputs and outputs.
+"""
+
 import re
-import html
 import logging
-import traceback
-from typing import Any, Dict, List, Optional, Union, Callable
+import warnings
+from typing import Dict, List, Any, Optional, Union, Callable, TypeVar, Type, cast, Any
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer
+from PIL import Image
 
-from resk_llm.openai_protector import OpenAIProtector  # type: ignore [import-untyped]
-from resk_llm.tokenizer_protection import SecureTokenizer, TokenizerProtector
+from resk_llm.tokenizer_protection import ReskWordsLists
+from resk_llm.filtering_patterns import check_for_obfuscation, sanitize_text_from_obfuscation
+from resk_llm.core.abc import ProtectorBase
 
-# Configuration du logger
+# Type definitions
+HuggingFaceProtectorConfig = Dict[str, Any]
+MultiModalProtectorConfig = Dict[str, Any]
+
+# Logger configuration
 logger = logging.getLogger(__name__)
 
-class HuggingFaceProtector:
+class HuggingFaceProtector(ProtectorBase[str, str, HuggingFaceProtectorConfig]):
     """
-    Protecteur pour les modèles et pipelines Hugging Face.
-    Ajoute une couche de sécurité pour les modèles de langage, d'image et multimodaux.
-    """
-    def __init__(self, 
-                 use_openai_protection: bool = True,
-                 model: str = "gpt-4o", 
-                 max_tokens: int = 1024,
-                 sanitize_outputs: bool = True):
-        """
-        Initialise le protecteur Hugging Face.
-        
-        Args:
-            use_openai_protection: Utiliser la protection OpenAI pour les LLM
-            model: Modèle OpenAI à utiliser si use_openai_protection est True
-            max_tokens: Nombre maximum de tokens à traiter
-            sanitize_outputs: Nettoyer les sorties des modèles
-        """
-        self.use_openai_protection = use_openai_protection
-        if use_openai_protection:
-            self.protector = OpenAIProtector(model=model)
-        self.max_tokens = max_tokens
-        self.sanitize_outputs = sanitize_outputs
-        
-    def secure_tokenizer(self, tokenizer):
-        """
-        Sécurise un tokenizer Hugging Face.
-        
-        Args:
-            tokenizer: Tokenizer Hugging Face à sécuriser
-            
-        Returns:
-            TokenizerProtector sécurisé
-        """
-        return TokenizerProtector(tokenizer)
+    Protector for Hugging Face text models.
     
-    def secure_pipeline(self, pipeline):
+    This class provides protection mechanisms for Hugging Face text models,
+    implementing input and output sanitization to prevent prompt injections
+    and other security issues.
+    """
+    
+    def __init__(self, config: Optional[HuggingFaceProtectorConfig] = None):
         """
-        Sécurise un pipeline Hugging Face.
+        Initialize the Hugging Face protector.
         
         Args:
-            pipeline: Pipeline Hugging Face à sécuriser
-            
-        Returns:
-            Pipeline sécurisé
+            config: Configuration dictionary which may contain:
+                model_name: Model name to use for tokenization (e.g. "gpt2")
+                max_tokens: Maximum tokens allowed in input
+                enable_detection: Enable detection of malicious content
+                enable_sanitization: Enable sanitization of inputs
+                tokenizer: Custom tokenizer to use
         """
-        original_call = pipeline.__call__
+        default_config: HuggingFaceProtectorConfig = {
+            'model_name': 'gpt2',
+            'max_tokens': 4096,
+            'enable_detection': True,
+            'enable_sanitization': True,
+            'tokenizer': None
+        }
         
-        # Méthode sécurisée pour le pipeline
-        def secure_pipeline_call(texts, *args, **kwargs):
+        if config:
+            default_config.update(config)
+            
+        super().__init__(default_config)
+        
+        # Initialize properties from config
+        self.model_name = self.config.get('model_name', 'gpt2')
+        self.max_tokens = self.config.get('max_tokens', 4096)
+        self.enable_detection = self.config.get('enable_detection', True)
+        self.enable_sanitization = self.config.get('enable_sanitization', True)
+        
+        # Initialize tokenizer
+        self.tokenizer = self.config.get('tokenizer')
+        if self.tokenizer is None:
             try:
-                # Nettoyer les entrées
-                if isinstance(texts, str):
-                    cleaned_text = self._sanitize_text(texts)
-                    
-                    # Vérifier les motifs malveillants si la protection OpenAI est activée
-                    if self.use_openai_protection:
-                        warning = self.protector.ReskWordsLists.check_input(cleaned_text)
-                        if warning:
-                            logger.warning(f"Tentative d'injection détectée: {warning}")
-                            return {"error": warning}
-                            
-                    texts = cleaned_text
-                elif isinstance(texts, list):
-                    cleaned_texts = []
-                    for text in texts:
-                        if isinstance(text, str):
-                            cleaned_text = self._sanitize_text(text)
-                            
-                            # Vérifier les motifs malveillants si la protection OpenAI est activée
-                            if self.use_openai_protection:
-                                warning = self.protector.ReskWordsLists.check_input(cleaned_text)
-                                if warning:
-                                    logger.warning(f"Tentative d'injection détectée: {warning}")
-                                    return {"error": warning}
-                                    
-                            cleaned_texts.append(cleaned_text)
-                        else:
-                            cleaned_texts.append(text)
-                    texts = cleaned_texts
-                
-                # Appel sécurisé au pipeline original
-                result = original_call(texts, *args, **kwargs)
-                
-                # Nettoyer les sorties si nécessaire
-                if self.sanitize_outputs:
-                    result = self._sanitize_output(result)
-                
-                return result
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             except Exception as e:
-                logger.error(f"Erreur dans secure_pipeline_call: {str(e)}\n{traceback.format_exc()}")
-                return {"error": "Une erreur s'est produite lors du traitement de votre demande."}
+                warnings.warn(f"Could not load tokenizer for {self.model_name}: {str(e)}")
+                self.tokenizer = None
         
-        # Remplacer la méthode originale
-        pipeline.__call__ = secure_pipeline_call
-        
-        return pipeline
+        # Initialize ReskWordsLists
+        self.resk_words_lists = ReskWordsLists()
     
-    def secure_model(self, model, tokenizer=None):
-        """
-        Sécurise un modèle Hugging Face.
-        
-        Args:
-            model: Modèle Hugging Face à sécuriser
-            tokenizer: Tokenizer associé au modèle
+    def _validate_config(self) -> None:
+        """Validate the configuration."""
+        if not isinstance(self.config.get('model_name', 'gpt2'), str):
+            raise ValueError("model_name must be a string")
             
-        Returns:
-            Modèle sécurisé
-        """
-        # Sécuriser le tokenizer si fourni
-        if tokenizer:
-            secure_tokenizer = self.secure_tokenizer(tokenizer)
+        if not isinstance(self.config.get('max_tokens', 4096), int):
+            raise ValueError("max_tokens must be an integer")
+            
+        if not isinstance(self.config.get('enable_detection', True), bool):
+            raise ValueError("enable_detection must be a boolean")
+            
+        if not isinstance(self.config.get('enable_sanitization', True), bool):
+            raise ValueError("enable_sanitization must be a boolean")
+            
+        if 'tokenizer' in self.config and self.config['tokenizer'] is not None:
+            if not isinstance(self.config['tokenizer'], PreTrainedTokenizer):
+                raise ValueError("tokenizer must be a PreTrainedTokenizer or None")
+    
+    def update_config(self, config: HuggingFaceProtectorConfig) -> None:
+        """Update the configuration with new values."""
+        self.config.update(config)
+        self._validate_config()
         
-        # Sauvegarder les méthodes originales
-        original_generate = getattr(model, "generate", None)
-        original_forward = getattr(model, "forward", None)
-        
-        # Sécuriser la méthode generate si elle existe
-        if original_generate:
-            def secure_generate(input_ids=None, attention_mask=None, *args, **kwargs):
+        # Update instance attributes
+        if 'model_name' in config:
+            self.model_name = config['model_name']
+            if 'tokenizer' not in config:
                 try:
-                    # Limiter la taille de sortie
-                    if "max_length" not in kwargs:
-                        kwargs["max_length"] = self.max_tokens
-                    elif kwargs["max_length"] > self.max_tokens * 2:
-                        kwargs["max_length"] = self.max_tokens * 2
-                    
-                    # Éviter les répétitions infinies
-                    if "repetition_penalty" not in kwargs:
-                        kwargs["repetition_penalty"] = 1.2
-                    
-                    # Exécuter la méthode originale
-                    result = original_generate(input_ids=input_ids, attention_mask=attention_mask, *args, **kwargs)
-                    
-                    return result
+                    self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
                 except Exception as e:
-                    logger.error(f"Erreur dans secure_generate: {str(e)}\n{traceback.format_exc()}")
-                    return None
-            
-            # Remplacer la méthode originale
-            model.generate = secure_generate
+                    warnings.warn(f"Could not load tokenizer for {self.model_name}: {str(e)}")
         
-        # Sécuriser la méthode forward si elle existe
-        if original_forward:
-            def secure_forward(*args, **kwargs):
-                try:
-                    # Vérifier et nettoyer les entrées
-                    if "input_ids" in kwargs and hasattr(kwargs["input_ids"], "shape"):
-                        if kwargs["input_ids"].shape[1] > self.max_tokens:
-                            logger.warning(f"Troncature des entrées trop longues: {kwargs['input_ids'].shape[1]} > {self.max_tokens}")
-                            kwargs["input_ids"] = kwargs["input_ids"][:, :self.max_tokens]
-                    
-                    # Exécuter la méthode originale
-                    result = original_forward(*args, **kwargs)
-                    
-                    return result
-                except Exception as e:
-                    logger.error(f"Erreur dans secure_forward: {str(e)}\n{traceback.format_exc()}")
-                    return None
-            
-            # Remplacer la méthode originale
-            model.forward = secure_forward
+        if 'max_tokens' in config:
+            self.max_tokens = config['max_tokens']
         
-        return model
+        if 'enable_detection' in config:
+            self.enable_detection = config['enable_detection']
+        
+        if 'enable_sanitization' in config:
+            self.enable_sanitization = config['enable_sanitization']
+        
+        if 'tokenizer' in config:
+            self.tokenizer = config['tokenizer']
     
-    def _sanitize_text(self, text: str) -> str:
+    def protect(self, text: str) -> str:
         """
-        Nettoie un texte d'entrée.
+        Main protection method required by ProtectorBase.
+        Sanitizes and checks the input text for malicious content.
         
         Args:
-            text: Texte à nettoyer
+            text: Input text to protect
             
         Returns:
-            Texte nettoyé
+            Protected version of the input text
+            
+        Raises:
+            ValueError: If the input contains malicious content and detection is enabled
         """
-        if self.use_openai_protection:
-            return self.protector.sanitize_input(text)
+        sanitized_text = text
         
-        # Nettoyage de base si la protection OpenAI n'est pas utilisée
-        text = text.encode('utf-8', errors='ignore').decode('utf-8')
-        text = re.sub(r'<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>', '', text)
-        text = html.escape(text, quote=False)
-        return text
+        # Check for obfuscation (hidden characters, unicode tricks, etc.)
+        obfuscation = check_for_obfuscation(text)
+        if obfuscation:
+            sanitized_text = sanitize_text_from_obfuscation(text)
+        
+        # Apply sanitization if enabled
+        if self.enable_sanitization:
+            sanitized_text = self.sanitize_input(sanitized_text)
+        
+        # Check for malicious content if detection is enabled
+        if self.enable_detection:
+            warning = self.resk_words_lists.check_input(sanitized_text)
+            if warning:
+                raise ValueError(f"Malicious content detected: {warning}")
+        
+        # Check token length if tokenizer is available
+        if self.tokenizer:
+            tokens = self.tokenizer.encode(sanitized_text)
+            if len(tokens) > self.max_tokens:
+                warnings.warn(f"Input exceeds maximum token length ({len(tokens)} > {self.max_tokens})")
+                sanitized_text = self.tokenizer.decode(tokens[:self.max_tokens])
+        
+        return sanitized_text
     
-    def _sanitize_output(self, output: Any) -> Any:
+    def sanitize_input(self, text: str) -> str:
         """
-        Nettoie une sortie de modèle.
+        Sanitize the input text.
         
         Args:
-            output: Sortie à nettoyer
+            text: Input text to sanitize
             
         Returns:
-            Sortie nettoyée
+            Sanitized text
         """
-        if isinstance(output, str):
-            return self._sanitize_text(output)
-        elif isinstance(output, list):
-            return [self._sanitize_output(item) for item in output]
-        elif isinstance(output, dict):
-            return {key: self._sanitize_output(value) for key, value in output.items()}
+        # Basic sanitization: remove control characters and zero-width spaces
+        sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\u200B-\u200F\u2028-\u202F\u2060-\u206F]', '', text)
+        
+        # Normalize whitespace
+        sanitized = re.sub(r'\s+', ' ', sanitized)
+        
+        # Remove potential HTML/XML tags
+        sanitized = re.sub(r'<[^>]*>', '', sanitized)
+        
+        return sanitized
+    
+    def tokenize(self, text: str) -> List[int]:
+        """
+        Tokenize the input text.
+        
+        Args:
+            text: Input text to tokenize
+            
+        Returns:
+            List of token IDs
+            
+        Raises:
+            ValueError: If tokenizer is not initialized
+        """
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer not initialized")
+        
+        return self.tokenizer.encode(text)
+    
+    def detokenize(self, tokens: List[int]) -> str:
+        """
+        Convert tokens back to text.
+        
+        Args:
+            tokens: List of token IDs
+            
+        Returns:
+            Decoded text
+            
+        Raises:
+            ValueError: If tokenizer is not initialized
+        """
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer not initialized")
+        
+        return self.tokenizer.decode(tokens)
+    
+    def check_for_forbidden_words(self, text: str) -> Optional[str]:
+        """
+        Check if the text contains forbidden words.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            Warning message if forbidden words are found, None otherwise
+        """
+        return self.resk_words_lists.check_input(text)
+
+    # Implementation for abstract methods
+    def protect_input(self, prompt: str, **kwargs) -> str:
+        """Apply security measures to the input before sending to the LLM."""
+        # Delegate to the existing protect method for input protection
+        return self.protect(prompt)
+
+    def protect_output(self, response: str, **kwargs) -> str:
+        """Apply security measures to the output received from the LLM."""
+        # Basic sanitization for output, can be expanded
+        if self.enable_sanitization:
+             return self.sanitize_input(response)
+        return response
+
+
+class MultiModalProtector(ProtectorBase[Union[str, Image.Image, Dict[str, Any]], Union[str, Dict[str, Any]], MultiModalProtectorConfig]):
+    """
+    Protector for multi-modal models that handle both text and images.
+    
+    This class extends protection to multi-modal models that handle both
+    text and visual inputs, with specific protection mechanisms for each modality.
+    """
+    
+    def __init__(self, config: Optional[MultiModalProtectorConfig] = None):
+        """
+        Initialize the multi-modal protector.
+        
+        Args:
+            config: Configuration dictionary which may contain:
+                text_model: Model name for text protection
+                max_tokens: Maximum tokens allowed in input
+                enable_text_detection: Enable detection for text inputs
+                enable_text_sanitization: Enable sanitization for text inputs
+                enable_image_sanitization: Enable sanitization for image inputs
+                text_tokenizer: Custom tokenizer for text
+        """
+        default_config: MultiModalProtectorConfig = {
+            'text_model': 'gpt2',
+            'max_tokens': 4096,
+            'enable_text_detection': True,
+            'enable_text_sanitization': True,
+            'enable_image_sanitization': True,
+            'text_tokenizer': None
+        }
+        
+        if config:
+            default_config.update(config)
+            
+        super().__init__(default_config)
+        
+        # Initialize properties from config
+        self.text_model = self.config.get('text_model', 'gpt2')
+        self.max_tokens = self.config.get('max_tokens', 4096)
+        self.enable_text_detection = self.config.get('enable_text_detection', True)
+        self.enable_text_sanitization = self.config.get('enable_text_sanitization', True)
+        self.enable_image_sanitization = self.config.get('enable_image_sanitization', True)
+        
+        # Initialize text protector
+        self.text_protector = HuggingFaceProtector({
+            'model_name': self.text_model,
+            'max_tokens': self.max_tokens,
+            'enable_detection': self.enable_text_detection,
+            'enable_sanitization': self.enable_text_sanitization,
+            'tokenizer': self.config.get('text_tokenizer')
+        })
+    
+    def _validate_config(self) -> None:
+        """Validate the configuration."""
+        if not isinstance(self.config.get('text_model', 'gpt2'), str):
+            raise ValueError("text_model must be a string")
+            
+        if not isinstance(self.config.get('max_tokens', 4096), int):
+            raise ValueError("max_tokens must be an integer")
+            
+        if not isinstance(self.config.get('enable_text_detection', True), bool):
+            raise ValueError("enable_text_detection must be a boolean")
+            
+        if not isinstance(self.config.get('enable_text_sanitization', True), bool):
+            raise ValueError("enable_text_sanitization must be a boolean")
+            
+        if not isinstance(self.config.get('enable_image_sanitization', True), bool):
+            raise ValueError("enable_image_sanitization must be a boolean")
+    
+    def update_config(self, config: MultiModalProtectorConfig) -> None:
+        """Update the configuration with new values."""
+        self.config.update(config)
+        self._validate_config()
+        
+        # Update instance attributes
+        if 'text_model' in config:
+            self.text_model = config['text_model']
+        
+        if 'max_tokens' in config:
+            self.max_tokens = config['max_tokens']
+        
+        if 'enable_text_detection' in config:
+            self.enable_text_detection = config['enable_text_detection']
+        
+        if 'enable_text_sanitization' in config:
+            self.enable_text_sanitization = config['enable_text_sanitization']
+        
+        if 'enable_image_sanitization' in config:
+            self.enable_image_sanitization = config['enable_image_sanitization']
+        
+        # Recreate text protector with updated config
+        updated_text_config = {
+            'model_name': self.text_model,
+            'max_tokens': self.max_tokens,
+            'enable_detection': self.enable_text_detection,
+            'enable_sanitization': self.enable_text_sanitization
+        }
+        
+        if 'text_tokenizer' in config:
+            updated_text_config['tokenizer'] = config['text_tokenizer']
+        
+        self.text_protector.update_config(updated_text_config)
+    
+    # Implementation for abstract methods
+    def protect_input(self, prompt: Any, **kwargs) -> Any:
+        """Apply security measures to the input before sending to the LLM."""
+        # Add type checking internally
+        if not isinstance(prompt, (str, Image.Image, dict)):
+             logger.warning(f"MultiModalProtector received unsupported input type: {type(prompt)}. Passing through.")
+             return prompt
+             
+        # Delegate to the existing protect method for input protection
+        return self.protect(prompt)
+
+    def protect_output(self, response: Union[str, Dict[str, Any]], **kwargs) -> Union[str, Dict[str, Any]]:
+        """Apply security measures to the output received from the LLM."""
+        # Handle different output types
+        if isinstance(response, str):
+            return self.sanitize_text(response) # Use the class's sanitize_text
+        elif isinstance(response, dict):
+            # Basic protection for dictionary outputs (e.g., text fields)
+            return self._protect_dict(response) # Use the existing dict protection logic
         else:
-            return output
+            # Pass through unknown types
+            return response
 
-
-class MultiModalProtector:
-    """
-    Protecteur spécialisé pour les modèles multimodaux, incluant la sécurité
-    des entrées texte, image et audio.
-    """
-    def __init__(self, 
-                 use_openai_protection: bool = True,
-                 model: str = "gpt-4o", 
-                 max_tokens: int = 1024,
-                 image_content_filtering: bool = True,
-                 audio_content_filtering: bool = True):
+    def protect(self, data: Union[str, Image.Image, Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
         """
-        Initialise le protecteur multimodal.
+        Main protection method required by ProtectorBase.
+        Provides appropriate protection based on input type.
         
         Args:
-            use_openai_protection: Utiliser la protection OpenAI pour les LLM
-            model: Modèle OpenAI à utiliser si use_openai_protection est True
-            max_tokens: Nombre maximum de tokens à traiter
-            image_content_filtering: Activer le filtrage du contenu des images
-            audio_content_filtering: Activer le filtrage du contenu audio
-        """
-        self.hf_protector = HuggingFaceProtector(
-            use_openai_protection=use_openai_protection,
-            model=model,
-            max_tokens=max_tokens
-        )
-        self.image_content_filtering = image_content_filtering
-        self.audio_content_filtering = audio_content_filtering
-    
-    def secure_vision_model(self, model, processor=None):
-        """
-        Sécurise un modèle de vision.
-        
-        Args:
-            model: Modèle de vision à sécuriser
-            processor: Processeur associé au modèle
+            data: Input data to protect (text, image, or dictionary with both)
             
         Returns:
-            Modèle sécurisé
+            Protected version of the input
+            
+        Raises:
+            ValueError: If the input contains malicious content
+            TypeError: If the input type is not supported
         """
-        # Sécuriser le processeur si fourni
-        if processor:
-            original_process = processor.__call__
-            
-            def secure_process(images=None, text=None, *args, **kwargs):
-                try:
-                    # Nettoyer le texte si présent
-                    if text is not None:
-                        if isinstance(text, str):
-                            text = self.hf_protector._sanitize_text(text)
-                        elif isinstance(text, list):
-                            text = [
-                                self.hf_protector._sanitize_text(t) if isinstance(t, str) else t
-                                for t in text
-                            ]
-                    
-                    # Filtrer les images si activé
-                    if self.image_content_filtering and images is not None:
-                        # Le filtrage d'image réel nécessiterait un modèle de détection
-                        # Ici, nous nous contentons d'un message de log
-                        logger.info("Filtrage d'image appliqué (simulation)")
-                    
-                    # Exécuter la méthode originale
-                    result = original_process(images=images, text=text, *args, **kwargs)
-                    
-                    return result
-                except Exception as e:
-                    logger.error(f"Erreur dans secure_process: {str(e)}\n{traceback.format_exc()}")
-                    return None
-            
-            # Remplacer la méthode originale
-            processor.__call__ = secure_process
+        # Handle text input
+        if isinstance(data, str):
+            return self.text_protector.protect(data)
         
-        # Sécuriser le modèle lui-même
-        return self.hf_protector.secure_model(model)
+        # Handle image input
+        elif isinstance(data, Image.Image):
+            return self._protect_image(data)
+        
+        # Handle dictionary input (common for multi-modal models)
+        elif isinstance(data, dict):
+            return self._protect_dict(data)
+        
+        # Unsupported input type
+        else:
+            raise TypeError(f"Unsupported input type: {type(data)}")
     
-    def secure_audio_model(self, model, processor=None):
+    def _protect_image(self, image: Image.Image) -> Image.Image:
         """
-        Sécurise un modèle audio.
+        Protect an image input.
         
         Args:
-            model: Modèle audio à sécuriser
-            processor: Processeur associé au modèle
+            image: Input image to protect
             
         Returns:
-            Modèle sécurisé
+            Protected image
         """
-        # Sécuriser le processeur si fourni
-        if processor:
-            original_process = processor.__call__
-            
-            def secure_audio_process(audio=None, text=None, *args, **kwargs):
-                try:
-                    # Nettoyer le texte si présent
-                    if text is not None:
-                        if isinstance(text, str):
-                            text = self.hf_protector._sanitize_text(text)
-                        elif isinstance(text, list):
-                            text = [
-                                self.hf_protector._sanitize_text(t) if isinstance(t, str) else t
-                                for t in text
-                            ]
-                    
-                    # Filtrer l'audio si activé
-                    if self.audio_content_filtering and audio is not None:
-                        # Le filtrage audio réel nécessiterait un modèle spécifique
-                        # Ici, nous nous contentons d'un message de log
-                        logger.info("Filtrage audio appliqué (simulation)")
-                    
-                    # Exécuter la méthode originale
-                    result = original_process(audio=audio, text=text, *args, **kwargs)
-                    
-                    return result
-                except Exception as e:
-                    logger.error(f"Erreur dans secure_audio_process: {str(e)}\n{traceback.format_exc()}")
-                    return None
-            
-            # Remplacer la méthode originale
-            processor.__call__ = secure_audio_process
+        # Currently a placeholder for image sanitization
+        # Real implementation would check for steganography, metadata, etc.
+        if self.enable_image_sanitization:
+            # Remove EXIF and other metadata
+            data = list(image.getdata())
+            clean_img = Image.new(image.mode, image.size)
+            clean_img.putdata(data)
+            return clean_img
         
-        # Sécuriser le modèle lui-même
-        return self.hf_protector.secure_model(model) 
+        return image
+    
+    def _protect_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Protect a dictionary containing multi-modal data.
+        
+        Args:
+            data: Dictionary containing text and/or image data
+            
+        Returns:
+            Protected dictionary
+        """
+        result: Dict[str, Any] = {}
+        
+        for key, value in data.items():
+            if isinstance(value, str):
+                result[key] = self.text_protector.protect(value)
+            elif isinstance(value, Image.Image):
+                result[key] = self._protect_image(value)
+            elif isinstance(value, dict):
+                result[key] = self._protect_dict(value)
+            elif isinstance(value, list):
+                result[key] = self._protect_list(value)
+            else:
+                result[key] = value
+        
+        return result
+    
+    def _protect_list(self, data: List[Any]) -> List[Any]:
+        """
+        Protect a list containing multi-modal data.
+        
+        Args:
+            data: List containing text and/or image data
+            
+        Returns:
+            Protected list
+        """
+        result: List[Any] = []
+        
+        for item in data:
+            if isinstance(item, str):
+                result.append(self.text_protector.protect(item))
+            elif isinstance(item, Image.Image):
+                result.append(self._protect_image(item))
+            elif isinstance(item, dict):
+                result.append(self._protect_dict(item))
+            elif isinstance(item, list):
+                result.append(self._protect_list(item))
+            else:
+                result.append(item)
+        
+        return result
+    
+    def sanitize_text(self, text: str) -> str:
+        """
+        Sanitize text input.
+        
+        Args:
+            text: Text to sanitize
+            
+        Returns:
+            Sanitized text
+        """
+        return self.text_protector.sanitize_input(text)
+
+
+# Factory function to create an appropriate protector based on model type
+def create_huggingface_protector(
+    model_name: str,
+    is_multimodal: bool = False,
+    config: Optional[Dict[str, Any]] = None
+) -> Union[HuggingFaceProtector, MultiModalProtector]:
+    """
+    Create a Hugging Face protector based on model type.
+    
+    Args:
+        model_name: Name of the Hugging Face model
+        is_multimodal: Whether the model is multi-modal
+        config: Additional configuration options
+        
+    Returns:
+        An appropriate protector instance for the model
+    """
+    if not config:
+        config = {}
+    
+    if is_multimodal:
+        mm_config: MultiModalProtectorConfig = {
+            'text_model': model_name,
+            **config
+        }
+        return MultiModalProtector(mm_config)
+    else:
+        hf_config: HuggingFaceProtectorConfig = {
+            'model_name': model_name,
+            **config
+        }
+        return HuggingFaceProtector(hf_config) 

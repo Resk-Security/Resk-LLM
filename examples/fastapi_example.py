@@ -1,7 +1,8 @@
 """
-Exemple d'API FastAPI sécurisée avec RESK-LLM
-Ce script montre comment intégrer RESK-LLM avec FastAPI pour protéger
-contre les injections de prompts et autres vulnérabilités de sécurité.
+FastAPI API Example with RESK-LLM Security
+
+This script demonstrates how to integrate RESK-LLM with FastAPI to protect
+against prompt injections and other security vulnerabilities.
 """
 
 import os
@@ -13,25 +14,27 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Import des composants RESK-LLM
+# Import RESK-LLM components
 from resk_llm.providers_integration import OpenAIProtector
+from resk_llm.word_list_filter import WordListFilter
+from resk_llm.pattern_provider import FileSystemPatternProvider
 from openai import OpenAI
 
-# Configuration du logging
+# Logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Création de l'application FastAPI
+# Create FastAPI application
 app = FastAPI(
     title="RESK-LLM FastAPI Example",
-    description="API sécurisée avec RESK-LLM pour la protection contre les injections de prompts",
+    description="Secure API with RESK-LLM for protection against prompt injections",
     version="1.0.0"
 )
 
-# Configuration CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialisation du protecteur RESK-LLM
+# Initialize RESK-LLM protector
 resk_protector = OpenAIProtector(
     model="gpt-4o",
     preserved_prompts=2,
@@ -48,37 +51,41 @@ resk_protector = OpenAIProtector(
     response_sanitization=True
 )
 
-# Middleware de sécurité global
+# Initialize WordListFilter for checking requests
+pattern_provider = FileSystemPatternProvider()
+word_list_filter = WordListFilter(config={"pattern_provider": pattern_provider})
+
+# Global security middleware
 @app.middleware("http")
 async def resk_security_middleware(request: Request, call_next):
-    # Ignorer les routes de documentation et les méthodes GET
+    # Skip documentation routes and GET methods
     if request.url.path.startswith("/docs") or request.url.path.startswith("/openapi") or request.method == "GET":
         return await call_next(request)
     
-    # Pour les routes POST, vérifier le contenu
+    # For POST routes, check content
     if request.method == "POST":
         try:
-            # Copier le corps de la requête pour pouvoir à la fois le lire et le laisser disponible
+            # Copy request body to read it while keeping it available
             body_bytes = await request.body()
             body_str = body_bytes.decode('utf-8')
             
-            # Vérifier si le contenu contient des éléments malveillants
-            warning = resk_protector.ReskWordsLists.check_input(body_str)
-            if warning:
-                logger.warning(f"Requête bloquée: {warning}")
+            # Check if content contains malicious elements
+            passed, warning, _ = word_list_filter.filter(body_str)
+            if not passed:
+                logger.warning(f"Request blocked: {warning}")
                 return JSONResponse(
                     status_code=400,
-                    content={"error": f"Contenu non autorisé détecté: {warning}"}
+                    content={"error": f"Unauthorized content detected: {warning}"}
                 )
         except Exception as e:
-            logger.error(f"Erreur lors de la vérification de la requête: {e}")
-            # En cas d'erreur, on continue le traitement normal
+            logger.error(f"Error during request verification: {e}")
+            # If error, continue with normal processing
     
-    # Continuer le traitement normal de la requête
+    # Continue with normal request processing
     response = await call_next(request)
     return response
 
-# Modèles Pydantic pour l'API
+# Pydantic models for the API
 class Message(BaseModel):
     role: str
     content: str
@@ -93,12 +100,12 @@ class ChatResponse(BaseModel):
     is_safe: bool
     warnings: Optional[List[str]] = None
 
-# Dépendance pour obtenir le client OpenAI
+# Dependency to get OpenAI client
 def get_openai_client():
     api_key = os.environ.get("OPENAI_API_KEY", "your-api-key-here")
     return OpenAI(api_key=api_key)
 
-# Routes de l'API
+# API routes
 @app.get("/")
 async def root():
     return {"message": "RESK-LLM FastAPI Example API"}
@@ -106,13 +113,13 @@ async def root():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, client: OpenAI = Depends(get_openai_client)):
     """
-    Endpoint chat sécurisé qui filtre les messages avant de les envoyer à l'API OpenAI
+    Secure chat endpoint that filters messages before sending them to the OpenAI API
     """
     try:
-        # Convertir les messages au format attendu par l'API OpenAI
+        # Convert messages to format expected by OpenAI API
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         
-        # Utiliser RESK-LLM pour protéger l'appel à l'API OpenAI
+        # Use RESK-LLM to protect the OpenAI API call
         result = resk_protector.protect_openai_call(
             client.chat.completions.create,
             messages=messages,
@@ -120,32 +127,32 @@ async def chat(request: ChatRequest, client: OpenAI = Depends(get_openai_client)
             temperature=request.temperature
         )
         
-        # Vérifier s'il y a une erreur (détection de contenu interdit)
+        # Check if there's an error (prohibited content detection)
         if isinstance(result, dict) and "error" in result:
             return ChatResponse(
-                response="Je ne peux pas répondre à cette demande en raison de restrictions de sécurité.",
+                response="I cannot respond to this request due to security restrictions.",
                 is_safe=False,
                 warnings=[result["error"]]
             )
         
-        # Retourner la réponse sécurisée
+        # Return the secure response
         return ChatResponse(
             response=result.choices[0].message.content,
             is_safe=True
         )
         
     except Exception as e:
-        logger.error(f"Erreur lors du traitement de la requête: {e}")
+        logger.error(f"Error processing request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint pour tester la détection d'injections
+# Endpoint to test injection detection
 @app.post("/api/security-test")
 async def security_test(message: str):
     """
-    Endpoint pour tester la détection d'injections dans un message
+    Endpoint to test injection detection in a message
     """
-    warning = resk_protector.ReskWordsLists.check_input(message)
-    if warning:
+    passed, warning, _ = word_list_filter.filter(message)
+    if not passed:
         return {
             "is_safe": False,
             "warning": warning
@@ -153,26 +160,30 @@ async def security_test(message: str):
     else:
         return {
             "is_safe": True,
-            "message": "Le contenu est sûr"
+            "message": "Content is safe"
         }
 
-# Endpoint pour gérer les patterns personnalisés
+# Endpoint to manage custom patterns
 @app.post("/api/add-prohibited-pattern")
 async def add_prohibited_pattern(pattern: str, pattern_type: str = "word"):
     """
-    Ajoute un pattern interdit à la liste de sécurité
+    Adds a prohibited pattern to the security list
     """
     if pattern_type not in ["word", "pattern"]:
-        raise HTTPException(status_code=400, detail="Type de pattern invalide. Utilisez 'word' ou 'pattern'")
+        raise HTTPException(status_code=400, detail="Invalid pattern type. Use 'word' or 'pattern'")
     
-    success = resk_protector.ReskWordsLists.update_prohibited_list(pattern, "add", pattern_type)
-    if success:
-        return {"status": "success", "message": f"{pattern_type} ajouté avec succès"}
-    else:
-        raise HTTPException(status_code=500, detail=f"Échec de l'ajout du {pattern_type}")
+    # Add pattern to pattern provider
+    try:
+        if pattern_type == "word":
+            pattern_provider.add_keyword("custom", pattern)
+        else:
+            pattern_provider.add_regex_pattern("custom", pattern)
+        return {"status": "success", "message": f"{pattern_type} added successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add {pattern_type}: {str(e)}")
 
-# Lancer l'application avec uvicorn
+# Run application with uvicorn
 if __name__ == "__main__":
-    # Pour démarrer l'application:
+    # To start the application:
     # python fastapi_example.py
     uvicorn.run("fastapi_example:app", host="0.0.0.0", port=8000, reload=True) 

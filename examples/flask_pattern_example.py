@@ -12,6 +12,8 @@ from openai import OpenAI
 from functools import wraps
 
 from resk_llm import OpenAIProtector, FlaskProtector
+from resk_llm.word_list_filter import WordListFilter
+from resk_llm.pattern_provider import FileSystemPatternProvider
 from resk_llm.filtering_patterns import (
     check_for_obfuscation,
     sanitize_text_from_obfuscation,
@@ -32,6 +34,12 @@ def check_admin_auth():
     api_key = request.headers.get('X-API-Key')
     return api_key == ADMIN_API_KEY
 
+# Initialiser le fournisseur de patterns pour les patterns personnalisés
+pattern_provider = FileSystemPatternProvider(patterns_dir=PATTERNS_DIR)
+
+# Créer le filtre de liste de mots avec notre fournisseur de patterns
+word_list_filter = WordListFilter(config={"pattern_provider": pattern_provider})
+
 # Initialiser le protecteur Flask avec l'API de patterns activée
 flask_protector = FlaskProtector(
     app=app,
@@ -48,8 +56,8 @@ flask_protector = FlaskProtector(
 # Initialiser le client OpenAI
 client = OpenAI(api_key=API_KEY)
 
-# Initialiser le protecteur OpenAI
-openai_protector = OpenAIProtector(model="gpt-4o")
+# Initialiser le protecteur OpenAI avec notre filtre
+openai_protector = OpenAIProtector(model="gpt-4o", filters=[word_list_filter])
 
 # Page d'accueil simple
 @app.route('/')
@@ -360,12 +368,9 @@ def moderate_endpoint():
         cleaned_text = normalize_homoglyphs(cleaned_text)
         
         # Nettoyer le texte avec le protecteur OpenAI
-        final_cleaned_text = openai_protector.sanitize_input(cleaned_text)
+        passed, warning, final_cleaned_text = word_list_filter.filter(cleaned_text)
         
-        # Vérifier les motifs malveillants
-        warning = openai_protector.ReskWordsLists.check_input(final_cleaned_text)
-        
-        if warning:
+        if not passed:
             return jsonify({
                 "is_safe": False,
                 "warning": warning,

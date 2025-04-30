@@ -7,48 +7,78 @@ import uuid
 from typing import Dict, List, Set, Optional, Tuple, Any, Union
 from datetime import datetime
 
-class CanaryTokenManager:
+from resk_llm.core.abc import SecurityComponent, DetectorBase
+
+class CanaryTokenManager(SecurityComponent[Dict[str, Any]]):
     """
     Manages canary tokens for detecting data leaks in LLM prompts.
     Inserts unique tokens into prompts and checks if they appear in LLM responses.
     """
     
-    def __init__(self, token_length: int = 10, use_uuid: bool = True):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize the canary token manager.
         
         Args:
-            token_length: Length of the canary tokens if random string is used
-            use_uuid: Whether to use UUIDs instead of random strings
+            config: Configuration dictionary with options:
+                - token_length: Length of the canary tokens if random string is used
+                - use_uuid: Whether to use UUIDs instead of random strings
+                - token_prefix: Prefix for the canary tokens
+                - token_suffix: Suffix for the canary tokens
         """
+        default_config = {
+            'token_length': 10,
+            'use_uuid': True,
+            'token_prefix': 'CT',
+            'token_suffix': 'ZZ'
+        }
+        
+        if config:
+            default_config.update(config)
+            
+        super().__init__(default_config)
+        
         self.logger = logging.getLogger(__name__)
-        self.token_length = token_length
-        self.use_uuid = use_uuid
         
         # Track active tokens and their context
         self.active_tokens: Dict[str, Dict[str, Any]] = {}  # Dict[token_id, token_data]
         self.leaked_tokens: Dict[str, Dict[str, Any]] = {}  # Dict[token_id, leak_data]
-        
-        # Configure token format
-        self.token_prefix = "CT"
-        self.token_suffix = "ZZ"
         
         # Tracking metrics
         self.tokens_generated = 0
         self.tokens_leaked = 0
         self.creation_time = datetime.now()
     
+    def _validate_config(self) -> None:
+        """Validate the provided configuration."""
+        if 'token_length' in self.config and not isinstance(self.config['token_length'], int):
+            raise ValueError("token_length must be an integer")
+        
+        if 'use_uuid' in self.config and not isinstance(self.config['use_uuid'], bool):
+            raise ValueError("use_uuid must be a boolean")
+            
+        if 'token_prefix' in self.config and not isinstance(self.config['token_prefix'], str):
+            raise ValueError("token_prefix must be a string")
+            
+        if 'token_suffix' in self.config and not isinstance(self.config['token_suffix'], str):
+            raise ValueError("token_suffix must be a string")
+    
+    def update_config(self, config: Dict[str, Any]) -> None:
+        """Update the component's configuration."""
+        self.config.update(config)
+        self._validate_config()
+    
     def _generate_random_token(self) -> str:
         """Generate a random string token."""
         characters = string.ascii_letters + string.digits
-        random_part = ''.join(random.choice(characters) for _ in range(self.token_length))
-        return f"{self.token_prefix}{random_part}{self.token_suffix}"
+        random_part = ''.join(random.choice(characters) for _ in range(self.config['token_length']))
+        return f"{self.config['token_prefix']}{random_part}{self.config['token_suffix']}"
     
     def _generate_uuid_token(self) -> str:
         """Generate a UUID-based token."""
         # Use a UUID and keep only the first part to make it shorter
         uuid_str = str(uuid.uuid4()).split('-')[0]
-        return f"{self.token_prefix}{uuid_str}{self.token_suffix}"
+        return f"{self.config['token_prefix']}{uuid_str}{self.config['token_suffix']}"
     
     def generate_token(self, context_info: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -61,7 +91,7 @@ class CanaryTokenManager:
             The generated token string
         """
         # Generate a new token
-        if self.use_uuid:
+        if self.config['use_uuid']:
             token = self._generate_uuid_token()
         else:
             token = self._generate_random_token()
@@ -201,13 +231,30 @@ class CanaryTokenManager:
             'uptime_seconds': (datetime.now() - self.creation_time).total_seconds()
         }
 
-class CanaryTokenDetector:
+class CanaryTokenDetector(DetectorBase[str, Dict[str, Any]]):
     """
     Specialized detector for finding canary tokens in text.
     Can be used to detect tokens from other systems.
     """
     
-    def __init__(self):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the canary token detector.
+        
+        Args:
+            config: Configuration dictionary with options:
+                - additional_patterns: List of additional regex patterns to look for
+        """
+        # Add type annotation for default_config
+        default_config: Dict[str, List[str]] = {
+            'additional_patterns': []
+        }
+        
+        if config:
+            default_config.update(config)
+            
+        super().__init__(default_config)
+        
         self.logger = logging.getLogger(__name__)
         
         # Common canary token patterns
@@ -225,6 +272,50 @@ class CanaryTokenDetector:
             # Generic patterns that might catch other implementations
             re.compile(r'(?:CANARY|CT|HONEYPOT|HONEYTOKEN)[A-Za-z0-9\-_]{6,}')
         ]
+        
+        # Add any additional patterns from config
+        if self.config.get('additional_patterns'):
+            for pattern in self.config['additional_patterns']:
+                if isinstance(pattern, str):
+                    self.token_patterns.append(re.compile(pattern))
+    
+    def _validate_config(self) -> None:
+        """Validate the provided configuration."""
+        if 'additional_patterns' in self.config and not isinstance(self.config['additional_patterns'], list):
+            raise ValueError("additional_patterns must be a list of regex patterns")
+            
+    def update_config(self, config: Dict[str, Any]) -> None:
+        """Update the component's configuration."""
+        self.config.update(config)
+        self._validate_config()
+        
+        # Update patterns if needed
+        if 'additional_patterns' in config:
+            # Clear existing additional patterns
+            self.token_patterns = self.token_patterns[:5]  # Keep default patterns
+            
+            # Add new patterns
+            for pattern in self.config['additional_patterns']:
+                if isinstance(pattern, str):
+                    self.token_patterns.append(re.compile(pattern))
+    
+    def detect(self, data: str) -> Dict[str, Any]:
+        """
+        Detect canary tokens in the given text.
+        
+        Args:
+            data: The text to check for canary tokens
+            
+        Returns:
+            Dict with detection results including found tokens
+        """
+        detected_tokens = self.detect_tokens(data)
+        
+        return {
+            'tokens_detected': len(detected_tokens) > 0,
+            'detected_tokens': detected_tokens,
+            'count': len(detected_tokens)
+        }
     
     def detect_tokens(self, text: str) -> List[str]:
         """
@@ -234,15 +325,17 @@ class CanaryTokenDetector:
             text: The text to check for canary tokens
             
         Returns:
-            List of detected token strings
+            List of unique detected token strings
         """
-        detected_tokens = []
-        
+        all_matches = []
         for pattern in self.token_patterns:
             matches = pattern.findall(text)
-            detected_tokens.extend(matches)
+            all_matches.extend(matches)
+
+        # Return only unique tokens found
+        detected_tokens = list(set(all_matches))
         
         if detected_tokens:
-            self.logger.info(f"Detected {len(detected_tokens)} potential canary tokens")
+            self.logger.info(f"Detected {len(detected_tokens)} unique potential canary tokens (from {len(all_matches)} total matches)")
             
         return detected_tokens 

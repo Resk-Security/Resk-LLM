@@ -1,12 +1,12 @@
 """
-Module contenant des listes de tokens spéciaux pour différents modèles LLM.
-Ces tokens peuvent être utilisés pour les attaques d'injection de prompts.
+Module containing special token lists for different LLM models.
+These tokens can be used for prompt injection attacks.
 """
 
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Any, Union
 
-# Tokens spéciaux pour les modèles OpenAI
-OPENAI_SPECIAL_TOKENS = {
+# Special tokens for OpenAI models
+OPENAI_SPECIAL_TOKENS: Dict[str, List[str]] = {
     "general": [
         "<|endoftext|>",
         "<|fim_prefix|>",
@@ -34,20 +34,20 @@ OPENAI_SPECIAL_TOKENS = {
     ]
 }
 
-# Tokens spéciaux pour les modèles Anthropic Claude
-ANTHROPIC_SPECIAL_TOKENS = {
+# Special tokens for Anthropic Claude models
+ANTHROPIC_SPECIAL_TOKENS: Dict[str, List[str]] = {
     "claude": [
         "<human>", "</human>", 
         "<assistant>", "</assistant>",
-        "<system>", "</system>",
+        "<s>", "</s>",
         "<answer>", "</answer>",
         "<message>", "</message>",
         "\n\nHuman:", "\n\nAssistant:"
     ]
 }
 
-# Tokens spéciaux pour les modèles Meta Llama
-LLAMA_SPECIAL_TOKENS = {
+# Special tokens for Meta Llama models
+LLAMA_SPECIAL_TOKENS: Dict[str, List[str]] = {
     "llama": [
         "<|begin_of_text|>", "<|end_of_text|>",
         "<|begin_of_system|>", "<|end_of_system|>",
@@ -59,8 +59,8 @@ LLAMA_SPECIAL_TOKENS = {
     ]
 }
 
-# Tokens spéciaux pour les modèles Mistral
-MISTRAL_SPECIAL_TOKENS = {
+# Special tokens for Mistral models
+MISTRAL_SPECIAL_TOKENS: Dict[str, List[str]] = {
     "mistral": [
         "<s>", "</s>", 
         "<|system|>", "<|user|>", "<|assistant|>",
@@ -68,16 +68,16 @@ MISTRAL_SPECIAL_TOKENS = {
     ]
 }
 
-# Tokens spéciaux pour les modèles Cohere
-COHERE_SPECIAL_TOKENS = {
+# Special tokens for Cohere models
+COHERE_SPECIAL_TOKENS: Dict[str, List[str]] = {
     "cohere": [
         "<|USER|>", "<|ASSISTANT|>", "<|SYSTEM|>",
         "<|USER_END|>", "<|ASSISTANT_END|>", "<|SYSTEM_END|>"
     ]
 }
 
-# Regroupement de tous les tokens spéciaux
-ALL_SPECIAL_TOKENS = set()
+# Group all special tokens together
+ALL_SPECIAL_TOKENS: Set[str] = set()
 
 for token_list in OPENAI_SPECIAL_TOKENS.values():
     ALL_SPECIAL_TOKENS.update(token_list)
@@ -94,8 +94,8 @@ for token_list in MISTRAL_SPECIAL_TOKENS.values():
 for token_list in COHERE_SPECIAL_TOKENS.values():
     ALL_SPECIAL_TOKENS.update(token_list)
 
-# Caractères de contrôle qui peuvent être utilisés pour des attaques
-CONTROL_CHARS = {
+# Control characters that can be used for attacks
+CONTROL_CHARS: Dict[str, str] = {
     '\r': '\\r',  # Carriage Return
     '\n': '\\n',  # Line Feed
     '\t': '\\t',  # Tab
@@ -104,8 +104,7 @@ CONTROL_CHARS = {
     '\v': '\\v',  # Vertical Tab
     '\0': '\\0',  # Null character
     '\a': '\\a',  # Bell/Alert
-    '\x1b': '\\x1b',  # Escape (was '\e')
-    '\x1b': '\\x1b',  # Escape (hex)
+    '\x1b': '\\x1b',  # Escape
     '\u001b': '\\u001b',  # Escape (unicode)
     '\u0000': '\\u0000',  # Null
     '\u0007': '\\u0007',  # Bell
@@ -114,39 +113,39 @@ CONTROL_CHARS = {
     '\u001b[32m': '\\u001b[32m'  # Green ANSI
 }
 
-# Liste des caractères spéciaux pouvant être utilisés dans les attaques
-SPECIAL_CHARS = [
-    # Guillemets et délimiteurs
+# List of special characters that can be used in attacks
+SPECIAL_CHARS: List[str] = [
+    # Quotes and delimiters
     '"', "'", "`", """, """, "「", "」", "『", "』", "«", "»",
     
-    # Caractères d'échappement et de formatage
+    # Escape and formatting characters
     "\\", "%", "$", "#", "@", "&", "*", "^", "_", "~",
     
-    # Caractères de balisage
+    # Markup characters
     "<", ">", "{", "}", "[", "]", "(", ")", "|",
     
-    # Caractères de ponctuation spéciaux
+    # Special punctuation characters
     "…", "•", "◆", "★", "✓", "✗", "✓", "☑", "☐", "☒"
 ]
 
 def get_all_special_tokens() -> Set[str]:
     """
-    Retourne tous les tokens spéciaux de tous les modèles.
+    Returns all special tokens from all models.
     
     Returns:
-        Ensemble de tous les tokens spéciaux
+        Set containing all special tokens
     """
     return ALL_SPECIAL_TOKENS
 
 def get_model_special_tokens(model_type: str) -> List[str]:
     """
-    Retourne les tokens spéciaux pour un type de modèle spécifique.
+    Returns special tokens for a specific model type.
     
     Args:
-        model_type: Type de modèle ('openai', 'anthropic', 'llama', 'mistral', 'cohere')
+        model_type: Model type ('openai', 'anthropic', 'llama', 'mistral', 'cohere')
         
     Returns:
-        Liste des tokens spéciaux pour le type de modèle spécifié
+        List of special tokens for the specified model type
     """
     model_type = model_type.lower()
     

@@ -6,435 +6,432 @@ import socket
 from typing import Dict, List, Tuple, Any, Optional, Set, Union
 import tldextract
 
-class URLDetector:
+# Import RESK-LLM core components
+from resk_llm.core.abc import DetectorBase, PatternProviderBase
+
+logger = logging.getLogger(__name__)
+
+# Config and Result Types
+UrlDetectorConfig = Dict[str, Any]
+# Define the output type for the detect method - a detailed analysis report
+DetectionResult = Dict[str, Any]
+
+class URLDetector(DetectorBase[str, UrlDetectorConfig]):
     """
     Detects and analyzes URLs in text, identifying potentially malicious patterns.
+    Inherits from DetectorBase. The detect method returns a dictionary
+    containing the analysis results for all found URLs.
     """
-    
-    def __init__(self):
-        """Initialize the URL detector."""
-        self.logger = logging.getLogger(__name__)
-        
-        # Regex for finding URLs
-        self.url_regex = re.compile(
-            r'(?:(?:https?|ftp):\/\/|www\.)(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?',
-            re.IGNORECASE
-        )
-        
-        # Regex for detecting IP-based URLs
-        self.ip_url_regex = re.compile(
-            r'(?:https?|ftp):\/\/(?:\S+(?::\S*)?@)?(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(?::\d{2,5})?(?:\/[^\s]*)?',
-            re.IGNORECASE
-        )
-        
-        # Regex for obfuscated URLs
-        self.obfuscated_url_regex = re.compile(
-            r'(?:h(?:t(?:t(?:p(?:s)?)?)?)?)[: ]*(?:\\?\/\\?\/|\\\\|[\/\\]|%2F%2F)(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z]{2,})',
-            re.IGNORECASE
-        )
-        
-        # Regex for hex or encoded URLs
-        self.encoded_url_regex = re.compile(
-            r'(?:%[0-9A-Fa-f]{2})+',
-        )
-        
-        # Regex for port numbers (suspicious port ranges)
-        self.suspicious_port_regex = re.compile(
-            r':(?:6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{1,3}|[1-9])',
-            re.IGNORECASE
-        )
-        
-        # Known malicious TLDs/domains
-        self.suspicious_tlds = {
-            # Free TLDs often abused
-            'tk', 'ml', 'ga', 'cf', 'gq', 'xyz',
-            # Typosquatting on common TLDs
-            'cm', 'co', 'om', 'nx', 'info',
-            # Country TLDs with limited regulation
-            'ru', 'su', 'ws', 'cc',
-        }
-        
-        # Known phishing domains patterns
-        self.phishing_patterns = [
-            r'paypa[0-9]?\.',
-            r'amaz[0o]n\.',
-            # r'g[0o]{2}gl[e3]\.', # Commented out: Too broad, matches legitimate google.com
-            r'fb[0-9]?\.',
-            r'twitt[e3]r\.',
-            r'ap[p]?l[e3]\.',
-            r'micr[o0]s[o0]ft\.',
-            r'netfl[i1]x\.',
-            r'[a-z0-9]+\-secure\.',
-            r'secure\-[a-z0-9]+\.',
-            r'[a-z0-9]+\-verify\.',
-            r'verify\-[a-z0-9]+\.',
-            r'[a-z0-9]+\-signin\.',
-            r'signin\-[a-z0-9]+\.',
-            r'[a-z0-9]+\-login\.',
-            r'login\-[a-z0-9]+\.',
-        ]
-        
-        # Compile phishing patterns
-        self.phishing_regexes = [re.compile(pattern, re.IGNORECASE) for pattern in self.phishing_patterns]
-        
-        # Shortener services to flag
-        self.url_shorteners = {
-            'bit.ly', 'goo.gl', 't.co', 'tinyurl.com', 'is.gd', 'cli.gs', 'pic.gd', 
-            'DwarfURL.com', 'ow.ly', 'snurl.com', 'tiny.cc', 'short.to', 'BudURL.com',
-            'ping.fm', 'post.ly', 'Just.as', 'bkite.com', 'snipr.com', 'fic.kr', 
-            'loopt.us', 'doiop.com', 'twitthis.com', 'htxt.it', 'AltURL.com', 
-            'RedirX.com', 'DigBig.com', 'u.nu', 'a.co', 'amzn.to'
-        }
 
-        # Keywords for common brands
-        self.common_brand_keywords = {
-            'paypal', 'amazon', 'google', 'facebook', 'fb', 'twitter',
-            'apple', 'microsoft', 'netflix', 'instagram', 'linkedin',
-            'ebay', 'chase', 'wellsfargo', 'bankofamerica', 'citibank'
-            # Add more as needed
-        }
-        # Corresponding official domains for the brands above
-        self.official_brand_domains = {
-            'paypal.com', 'amazon.com', 'google.com', 'facebook.com',
-            'twitter.com', 'apple.com', 'microsoft.com', 'netflix.com',
-            'instagram.com', 'linkedin.com', 'ebay.com', 'chase.com',
-            'wellsfargo.com', 'bankofamerica.com', 'citi.com'
-            # Add corresponding official domains
-        }
+    # --- Default Configuration Values ---
+    DEFAULT_SUSPICIOUS_TLDS: Set[str] = {
+        'tk', 'ml', 'ga', 'cf', 'gq', 'xyz', 'cm', 'co', 'om', 'nx',
+        'info', 'ru', 'su', 'ws', 'cc', 'pw', 'top', 'icu', 'cyou', 'buzz'
+    }
+    DEFAULT_PHISHING_PATTERNS: List[str] = [
+        r'paypa[0-9]?\.', r'amaz[0o]n\.', r'fb[0-9]?\.', r'twitt[e3]r\.',
+        r'ap[p]?l[e3]\.', r'micr[o0]s[o0]ft\.', r'netfl[i1]x\.',
+        r'[a-z0-9]+\-secure\.', r'secure\-[a-z0-9]+\.',
+        r'[a-z0-9]+\-verify\.', r'verify\-[a-z0-9]+\.',
+        r'[a-z0-9]+\-signin\.', r'signin\-[a-z0-9]+\.',
+        r'[a-z0-9]+\-login\.', r'login\-[a-z0-9]+\.',
+    ]
+    DEFAULT_URL_SHORTENERS: Set[str] = {
+        'bit.ly', 'goo.gl', 't.co', 'tinyurl.com', 'is.gd', 'cli.gs',
+        'ow.ly', 'snurl.com', 'tiny.cc', 'short.to', 'buff.ly',
+        'ift.tt', 'j.mp', 'rebrand.ly', 'bl.ink', 'cutt.ly', 'rb.gy',
+        'u.nu', 'a.co', 'amzn.to'
+    }
+    DEFAULT_BRAND_KEYWORDS: Set[str] = {
+        'paypal', 'amazon', 'google', 'facebook', 'fb', 'twitter', 'apple',
+        'microsoft', 'netflix', 'instagram', 'linkedin', 'ebay', 'chase',
+        'wellsfargo', 'bankofamerica', 'citibank'
+    }
+    DEFAULT_OFFICIAL_BRAND_DOMAINS: Set[str] = {
+        'paypal.com', 'amazon.com', 'google.com', 'facebook.com', 'twitter.com',
+        'apple.com', 'microsoft.com', 'netflix.com', 'instagram.com',
+        'linkedin.com', 'ebay.com', 'chase.com', 'wellsfargo.com',
+        'bankofamerica.com', 'citi.com'
+    }
+    DEFAULT_SUSPICIOUS_KEYWORDS_IN_URL: Set[str] = {
+        'phish', 'login', 'signin', 'secure', 'verify', 'account', 'update',
+        'webscr', 'cmd', 'admin', 'confirm', 'support', 'service', 'recovery'
+    }
+    # Max subdomains before flagging as suspicious
+    DEFAULT_MAX_SUBDOMAINS = 3
+    # Risk score increments (can be tuned via config)
+    DEFAULT_RISK_INCREMENTS: Dict[str, int] = {
+        "ip_based": 15,
+        "numeric_domain": 10, # Additional risk for IP/numeric domain
+        "suspicious_ip_path": 35, # Keywords like /admin on IP URL (Increased from 30)
+        "shortener": 20,
+        "suspicious_port": 25,
+        "excessive_subdomains": 15,
+        "suspicious_tld": 30,
+        "phishing_pattern": 45, # Increased from 40
+        "suspicious_keyword": 25, # Increased from 20
+        "encoded_chars": 10,
+        "typosquatting": 50,
+        "suspicious_extension": 50, # Increased from 30
+        "invalid_structure": 100 # Should likely block immediately
+    }
 
-        # Keywords often found in phishing URLs
-        self.suspicious_keywords = {'phish', 'login', 'signin', 'secure', 'verify', 'account', 'update', 'webscr', 'cmd'}
-        
-    def extract_urls(self, text: str) -> List[str]:
+    # --- Regex Patterns (initialized in _validate_config) ---
+    url_regex: Optional[re.Pattern] = None
+    ip_url_regex: Optional[re.Pattern] = None
+    obfuscated_url_regex: Optional[re.Pattern] = None
+    encoded_url_regex: Optional[re.Pattern] = None
+    suspicious_port_regex: Optional[re.Pattern] = None
+    phishing_regexes: List[re.Pattern] = []
+
+
+    def __init__(self, config: Optional[UrlDetectorConfig] = None):
         """
-        Extract all URLs from the given text.
-        
+        Initialize the URL detector.
+
         Args:
-            text: The text to scan for URLs
+            config: Configuration dictionary. Can contain overrides for defaults:
+                'suspicious_tlds': Set[str]
+                'phishing_patterns': List[str]
+                'url_shorteners': Set[str]
+                'brand_keywords': Set[str]
+                'official_brand_domains': Set[str]
+                'suspicious_keywords_in_url': Set[str]
+                'max_subdomains': int
+                'risk_increments': Dict[str, int]
+                'use_defaults': bool (default True)
+                # Potentially add 'pattern_provider' integration later if needed
+        """
+        self.logger = logger
+        # Initialize attributes that will be set in _validate_config
+        self.suspicious_tlds: Set[str] = set()
+        self.phishing_patterns: List[str] = []
+        self.url_shorteners: Set[str] = set()
+        self.brand_keywords: Set[str] = set()
+        self.official_brand_domains: Set[str] = set()
+        self.suspicious_keywords_in_url: Set[str] = set()
+        self.max_subdomains: int = self.DEFAULT_MAX_SUBDOMAINS
+        self.risk_increments: Dict[str, int] = {}
+
+        super().__init__(config) # Calls _validate_config
+
+    def _compile_regex(self) -> None:
+        """Compile the necessary regex patterns."""
+        try:
+            self.url_regex = re.compile(
+                    r'(?:(?:https?|ftp):\/\/|www\.)(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:[\/?#][^\s]*)?',
+                re.IGNORECASE
+            )
+            self.ip_url_regex = re.compile(
+                     r'(?:https?|ftp):\/\/(?:\S+(?::\S*)?@)?(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(?::\d{2,5})?(?:[\/?#][^\s]*)?',
+                re.IGNORECASE
+            )
+            self.obfuscated_url_regex = re.compile(
+                     r'(?:h(?:t(?:t(?:p(?:s)?)?)?)?)[: ]*(?:\?\/?\?|\\\\|[\/\\]|%2F%2F)(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z]{2,})', # Simplified slightly
+                re.IGNORECASE
+            )
+            self.encoded_url_regex = re.compile(r'(?:%[0-9A-Fa-f]{2})+')
+            # Simplified port regex - checks for presence of :port
+            self.suspicious_port_regex = re.compile(r':([0-9]{1,5})(?:[\/?#]|$)')
+
+            # Compile phishing patterns from config
+            self.phishing_regexes = []
+            for pattern in self.phishing_patterns:
+                 try:
+                     self.phishing_regexes.append(re.compile(pattern, re.IGNORECASE))
+                 except re.error as e:
+                      self.logger.error(f"Invalid phishing regex pattern '{pattern}' skipped: {e}")
+
+        except re.error as e:
+             self.logger.error(f"Fatal error compiling core URL regex patterns: {e}", exc_info=True)
+             # This detector might be unusable if core regex fails
+             self.url_regex = None # Mark as unusable
+
+    def _validate_config(self) -> None:
+        """Validate configuration and load settings."""
+        if not isinstance(self.config, dict):
+            self.config = {}
+
+        use_defaults = self.config.get('use_defaults', True)
+
+        # Load settings, merging defaults and config values
+        self.suspicious_tlds = set(self.config.get('suspicious_tlds', self.DEFAULT_SUSPICIOUS_TLDS if use_defaults else set()))
+        self.phishing_patterns = list(self.config.get('phishing_patterns', self.DEFAULT_PHISHING_PATTERNS if use_defaults else []))
+        self.url_shorteners = set(self.config.get('url_shorteners', self.DEFAULT_URL_SHORTENERS if use_defaults else set()))
+        self.brand_keywords = set(self.config.get('brand_keywords', self.DEFAULT_BRAND_KEYWORDS if use_defaults else set()))
+        self.official_brand_domains = set(self.config.get('official_brand_domains', self.DEFAULT_OFFICIAL_BRAND_DOMAINS if use_defaults else set()))
+        self.suspicious_keywords_in_url = set(self.config.get('suspicious_keywords_in_url', self.DEFAULT_SUSPICIOUS_KEYWORDS_IN_URL if use_defaults else set()))
+        self.max_subdomains = int(self.config.get('max_subdomains', self.DEFAULT_MAX_SUBDOMAINS))
+
+        # Load risk increments, updating defaults with config values
+        self.risk_increments = self.DEFAULT_RISK_INCREMENTS.copy()
+        custom_increments = self.config.get('risk_increments', {})
+        if isinstance(custom_increments, dict):
+            self.risk_increments.update(custom_increments)
+        else:
+            self.logger.warning("Invalid 'risk_increments' format in config, expected dict. Using defaults.")
+
+        # Compile regex patterns based on loaded config
+        self._compile_regex()
+        self.logger.info("URLDetector configured.")
+
+    def update_config(self, config: UrlDetectorConfig) -> None:
+        """Update detector configuration and reload settings/patterns."""
+        self.config.update(config)
+        self._validate_config()
+
+    def _extract_urls(self, text: str) -> List[str]:
+        """Extract potential URLs from text using compiled regex."""
+        if not self.url_regex or not self.obfuscated_url_regex:
+             self.logger.error("URL regex patterns not compiled. Cannot extract URLs.")
+             return []
+
+        try:
+            standard_urls = self.url_regex.findall(text)
+            obfuscated_urls = self.obfuscated_url_regex.findall(text)
+            all_urls_set = set(standard_urls + obfuscated_urls)
             
-        Returns:
-            List of extracted URLs
-        """
-        # Find standard URLs
-        standard_urls = self.url_regex.findall(text)
-        
-        # Find obfuscated URLs 
-        obfuscated_urls = self.obfuscated_url_regex.findall(text)
-        
-        # Combine and deduplicate
-        all_urls_set = set(standard_urls + obfuscated_urls)
-        
-        # Post-processing: Remove shorter URLs that are prefixes of longer ones
-        final_urls = list(all_urls_set)
-        final_urls.sort(key=len, reverse=True) # Sort by length descending
+            # Simple deduplication for now, advanced prefix removal can be complex
+            # Consider adding http(s):// prefix if missing www. for better parsing later
+            processed_urls = set()
+            for url in all_urls_set:
+                 if url.lower().startswith('www.'):
+                      processed_urls.add(f"http://{url}") # Assume http for www. if no scheme
+                 else:
+                      processed_urls.add(url)
 
-        urls_to_keep = []
-        prefixes_to_remove = set()
+            # Filter out obvious non-URLs captured by broad regex (e.g. version numbers)
+            # A simple check: must contain at least one dot and one letter?
+            final_urls = [u for u in processed_urls if '.' in u and any(c.isalpha() for c in u)]
 
-        for i, url1 in enumerate(final_urls):
-            if url1 in prefixes_to_remove:
-                continue
-            for j in range(i + 1, len(final_urls)):
-                url2 = final_urls[j]
-                # Check if url2 is a prefix of url1 (ignoring potential trailing slash differences)
-                # And ensure it's not the exact same URL
-                if url1.startswith(url2) and len(url1) > len(url2):
-                    # Check if the difference is just a path/query component
-                    if len(url1) > len(url2) and url1[len(url2)] in ('/', '?', '#'):
-                         prefixes_to_remove.add(url2)
-                    # Handle case where domain is captured separately, e.g. example.com vs http://example.com/path
-                    elif url1.startswith(f"http://{url2}") or url1.startswith(f"https://{url2}"):
-                         prefixes_to_remove.add(url2)
+            return final_urls
+        except Exception as e:
+             self.logger.error(f"Error during URL extraction: {e}", exc_info=True)
+             return []
 
-        for url in final_urls:
-             if url not in prefixes_to_remove:
-                 urls_to_keep.append(url)
 
-        # Original order might be preferable for some use cases, but not critical for counting
-        # return sorted(urls_to_keep) 
-        return urls_to_keep
-    
-    def analyze_url(self, url: str) -> Dict[str, Any]:
-        """
-        Analyze a URL for suspicious characteristics.
-        
-        Args:
-            url: The URL to analyze
-            
-        Returns:
-            Dictionary with analysis results
-        """
+    def _analyze_url(self, url: str) -> Dict[str, Any]:
+        """Analyze a single URL for suspicious characteristics."""
         result: Dict[str, Any] = {
-            'url': url,
-            'is_suspicious': False,
-            'risk_score': 0,
-            'reasons': [],
-            'parsed': None,
-            'domain': None,
-            'tld': None,
-            'is_ip_based': False,
-            'uses_shortener': False,
-            'has_suspicious_port': False,
-            'has_excessive_subdomains': False,
-            'has_suspicious_tld': False,
-            'is_likely_phishing': False, # General phishing indicator
-            'is_likely_typosquatting': False, # Specific typosquatting flag
+            'url': url, 'is_suspicious': False, 'risk_score': 0, 'reasons': [],
+            'parsed': None, 'domain': None, 'tld': None, 'full_domain': None, 'subdomain': None,
+            'is_ip_based': False, 'uses_shortener': False, 'has_suspicious_port': False,
+            'has_excessive_subdomains': False, 'has_suspicious_tld': False,
+            'is_likely_phishing': False, 'is_likely_typosquatting': False,
             'has_encoded_chars': False,
         }
-        
-        # Basic risk scoring system
         risk_score = 0
         
         try:
-            # Parse the URL
-            parsed = urllib.parse.urlparse(url)
-            result['parsed'] = {
-                'scheme': parsed.scheme,
-                'netloc': parsed.netloc,
-                'path': parsed.path,
-                'params': parsed.params,
-                'query': parsed.query,
-                'fragment': parsed.fragment,
-            }
-            
-            # Extract domain info
-            domain_info = tldextract.extract(url)
-            result['domain'] = domain_info.domain
-            result['tld'] = domain_info.suffix
-            result['full_domain'] = domain_info.registered_domain
-            result['subdomain'] = domain_info.subdomain
-            
-            # Basic validation: requires scheme and netloc
-            if not parsed.scheme or not parsed.netloc:
-                result['reasons'].append("Invalid URL structure (missing scheme or netloc)")
-                result['is_suspicious'] = True
-                result['risk_score'] = 100 # Invalid URLs are highly suspicious
-                return result # Early exit for fundamentally broken URLs
+            # --- Parsing ---
+            try:
+                parsed = urllib.parse.urlparse(url)
+                if not parsed.scheme and url.startswith('//'): # Handle protocol-relative URLs
+                     url = f"http:{url}" # Assume http
+                     parsed = urllib.parse.urlparse(url) # Re-parse after adding scheme
+                elif not parsed.scheme: # Handle URLs without scheme (e.g., www.example.com)
+                     # Already handled in _extract_urls by adding http://
+                     pass # No action needed here
+
+                # Use tldextract for robust domain/subdomain/tld extraction
+                domain_info = tldextract.extract(url)
+                result['domain'] = domain_info.domain
+                result['tld'] = domain_info.suffix
+                result['full_domain'] = domain_info.registered_domain # Domain + TLD
+                result['subdomain'] = domain_info.subdomain
+
+                # Store parsed components
+                result['parsed'] = {
+                        'scheme': parsed.scheme, 'netloc': parsed.netloc, 'path': parsed.path,
+                        'params': parsed.params, 'query': parsed.query, 'fragment': parsed.fragment,
+                    }
+
+                # Require scheme and netloc for a valid parsable URL after potential fixes
+                if not parsed.scheme or not parsed.netloc:
+                    raise ValueError("Invalid URL structure (missing scheme or netloc after parsing)")
+
+            except ValueError as e: # Catch parsing errors
+                 result['reasons'].append(f"URL parsing error: {e}")
+                 risk_score += self.risk_increments.get("invalid_structure", 100)
+                 result['is_suspicious'] = True
+                 result['risk_score'] = risk_score
+                 # Return early as further analysis is not possible
+                 return result 
+
+            # --- Analysis Checks (Continue only if parsing succeeded) ---
                 
             # Check 1: IP-based URL
-            if self.ip_url_regex.match(url) or (domain_info.domain and all(c.isdigit() or c == '.' for c in domain_info.domain)):
+            is_ip_domain = False
+            if self.ip_url_regex and self.ip_url_regex.match(url):
+                 is_ip_domain = True
+            elif domain_info.domain and all(c.isdigit() or c == '.' for c in domain_info.domain):
+                 # Check if domain looks like an IP address
+                 try:
+                     ipaddress.ip_address(domain_info.domain)
+                     is_ip_domain = True
+                 except ValueError:
+                     pass # Not a valid IP format
+
+            if is_ip_domain:
                 result['is_ip_based'] = True
                 result['reasons'].append("IP-based URL")
-                risk_score += 15
-                # Check if IP is numeric (already partially covered by regex, but good fallback)
-                if any(char.isdigit() for char in result['domain']):
-                     result['reasons'].append("Domain contains numeric characters") # Added for IP case too
-                     risk_score += 10 # Add extra risk for numeric-only domains/IPs
-                
-                # Check for suspicious keywords in path for IP-based URLs
+                risk_score += self.risk_increments.get("ip_based", 15)
+                # Check for suspicious keywords in path for IP URLs
                 ip_path_keywords = {'admin', 'login', 'config', 'setup', 'manage', 'console'}
                 path_lower = parsed.path.lower()
-                found_ip_path_keywords = [kw for kw in ip_path_keywords if f'/{kw}' in path_lower] # Check for '/keyword'
-                if found_ip_path_keywords:
-                    result['reasons'].append(f"Suspicious path keyword(s) {found_ip_path_keywords} found on IP-based URL")
-                    risk_score += 30 # Significantly increase risk for this pattern
+                found_ip_kw = [kw for kw in ip_path_keywords if f'/{kw}' in path_lower]
+                if found_ip_kw:
+                    result['reasons'].append(f"Suspicious path keyword(s) on IP URL: {found_ip_kw}")
+                    risk_score += self.risk_increments.get("suspicious_ip_path", 35)
 
             # Check 2: Uses URL Shortener
-            if result['full_domain'] in self.url_shorteners:
+            if result['full_domain'] and result['full_domain'].lower() in self.url_shorteners:
                 result['uses_shortener'] = True
                 result['reasons'].append("Uses URL shortener")
-                risk_score += 20 # Increase risk slightly for shorteners
+                risk_score += self.risk_increments.get("shortener", 20)
                 
             # Check 3: Suspicious Port
-            if self.suspicious_port_regex.search(url):
-                result['has_suspicious_port'] = True
-                result['reasons'].append("Uses non-standard/suspicious port")
-                risk_score += 25
+            if self.suspicious_port_regex:
+                 port_match = self.suspicious_port_regex.search(parsed.netloc) # Search netloc directly
+                 if port_match:
+                     try:
+                          port = int(port_match.group(1))
+                          # Standard ports are usually OK, flag others or specific ranges
+                          if port not in {80, 443, 8080}: # Example common allowed ports
+                              result['has_suspicious_port'] = True
+                              result['reasons'].append(f"Uses non-standard port: {port}")
+                              risk_score += self.risk_increments.get("suspicious_port", 25)
+                     except ValueError:
+                          pass # Should not happen with regex, but ignore if it does
                 
             # Check 4: Excessive Subdomains
-            subdomain_parts = domain_info.subdomain.split('.') if domain_info.subdomain else []
-            if len(subdomain_parts) > 3: # e.g., more than login.secure.account.example.com
+            subdomain_parts = result['subdomain'].split('.') if result['subdomain'] else []
+            if len(subdomain_parts) > self.max_subdomains:
                 result['has_excessive_subdomains'] = True
-                result['reasons'].append("Excessive number of subdomains")
-                risk_score += 15
+                result['reasons'].append(f"Excessive subdomains ({len(subdomain_parts)} > {self.max_subdomains})")
+                risk_score += self.risk_increments.get("excessive_subdomains", 15)
                 
             # Check 5: Suspicious TLD
-            if result['tld'] in self.suspicious_tlds:
+            if result['tld'] and result['tld'].lower() in self.suspicious_tlds:
                 result['has_suspicious_tld'] = True
-                result['reasons'].append(f"Uses potentially suspicious TLD: {result['tld']}")
-                risk_score += 20
-                
-            # Check 6: Encoded Characters
-            if self.encoded_url_regex.search(url):
+                result['reasons'].append(f"Suspicious TLD: .{result['tld']}")
+                risk_score += self.risk_increments.get("suspicious_tld", 30)
+
+            # Check 6: Phishing Patterns in Domain/Subdomain
+            domain_to_check = f"{result['subdomain']}.{result['full_domain']}" if result['subdomain'] else result['full_domain']
+            if domain_to_check:
+                domain_lower = domain_to_check.lower()
+                for pattern in self.phishing_regexes:
+                     if pattern.search(domain_lower):
+                         result['is_likely_phishing'] = True
+                         result['reasons'].append(f"Phishing pattern match: {pattern.pattern}")
+                         risk_score += self.risk_increments.get("phishing_pattern", 45)
+                         break # One pattern match is enough
+
+            # Check 7: Suspicious Keywords in URL (domain, path, query)
+            url_lower = url.lower()
+            found_keywords = {kw for kw in self.suspicious_keywords_in_url if kw in url_lower}
+            if found_keywords:
+                 result['reasons'].append(f"Suspicious keyword(s) in URL: {found_keywords}")
+                 risk_score += self.risk_increments.get("suspicious_keyword", 25) * len(found_keywords) # Scale risk by number of keywords?
+
+            # Check 8: Encoded Characters in Path/Query
+            if self.encoded_url_regex and (self.encoded_url_regex.search(parsed.path) or self.encoded_url_regex.search(parsed.query)):
                 result['has_encoded_chars'] = True
                 result['reasons'].append("URL contains encoded characters")
-                risk_score += 10
-                
-            # Check 7: Typosquatting/Phishing Patterns (Domain)
-            if result['full_domain']: # Ensure we have a domain to check
-                for regex in self.phishing_regexes:
-                    if regex.search(result['full_domain']):
-                        result['is_likely_phishing'] = True
-                        result['reasons'].append("Domain pattern matches known phishing/typo patterns")
-                        risk_score += 35
-                        break # One match is enough
-                
-                # Check for brand keyword in subdomain of unofficial domain
-                if result['subdomain'] and result['full_domain'] not in self.official_brand_domains:
-                    found_brands = [brand for brand in self.common_brand_keywords if brand in result['subdomain'].lower().split('.')]
-                    if found_brands:
-                        result['is_likely_phishing'] = True
-                        result['reasons'].append(f"Brand keyword(s) {found_brands} in subdomain on unofficial domain {result['full_domain']}")
-                        risk_score += 40
+                risk_score += self.risk_increments.get("encoded_chars", 10)
 
-                # Check for potential typosquatting (numeric chars in domain, not IP)
-                if not result['is_ip_based'] and any(char.isdigit() for char in result['domain']):
-                     result['reasons'].append("Domain contains numeric characters")
-                     risk_score += 10
-                     # Simple check for common brand typos by substituting numbers
-                     substitutions = {'0': 'o', '1': 'l', '1': 'i', '3': 'e', '5': 's'} # Add more if needed
-                     normalized_domain = result['domain'].lower()
-                     for digit, letter in substitutions.items():
-                         normalized_domain = normalized_domain.replace(digit, letter)
-                     
-                     # Check if the normalized domain contains a brand keyword
-                     possible_brands = [brand for brand in self.common_brand_keywords if brand in normalized_domain]
-                     if possible_brands:
-                        result['is_likely_typosquatting'] = True
-                        result['reasons'].append(f"Potential typosquatting detected involving possible brand(s): {possible_brands}")
-                        risk_score += 40 # Higher risk if numbers are involved with brand names
+            # Check 9: Potential Typosquatting (Brand keyword in domain, but not official domain)
+            if result['full_domain']:
+                 domain_lower = result['full_domain'].lower()
 
-                # Check for suspicious keywords in domain/subdomain
-                domain_parts = (result['subdomain'] + '.' + result['domain']).lower().split('.')
-                found_suspicious_domain_keywords = [kw for kw in self.suspicious_keywords if kw in domain_parts]
-                if found_suspicious_domain_keywords:
-                     result['is_likely_phishing'] = True
-                     result['reasons'].append(f"Suspicious keyword(s) {found_suspicious_domain_keywords} found in domain/subdomain")
-                     risk_score += 30
+                 # Normalize common substitutions (0->o, 1->l, etc.) for comparison
+                 def normalize_for_typo(s: str) -> str:
+                    return s.replace('0', 'o').replace('1', 'l').replace('3', 'e').replace('5', 's').replace('@', 'a')
 
-            # Check 8: Suspicious Keywords in Path/Query
-            path_query = (parsed.path + '?' + parsed.query).lower()
-            found_suspicious_keywords = [kw for kw in self.suspicious_keywords if kw in path_query]
-            if found_suspicious_keywords:
-                result['reasons'].append(f"Suspicious keyword(s) {found_suspicious_keywords} found in path/query")
-                risk_score += 20
-                if any(kw in ['login', 'signin', 'verify', 'account'] for kw in found_suspicious_keywords):
-                    result['is_likely_phishing'] = True # Keywords highly indicative of phishing
-                    risk_score += 20 # Extra boost for very common phishing keywords
+                 normalized_domain = normalize_for_typo(domain_lower)
 
-            # Check 9: Dangerous File Extension in Path
-            dangerous_extensions = {'.exe', '.zip', '.rar', '.scr', '.dmg', '.msi', '.bat', '.cmd', '.js', '.vbs'}
-            if parsed.path and any(parsed.path.lower().endswith(ext) for ext in dangerous_extensions):
-                 result['reasons'].append("URL path points to potentially dangerous file extension")
-                 risk_score += 50 # High risk associated with direct executable downloads
+                 # Check if normalized domain contains a normalized brand keyword
+                 found_brand_kw = set()
+                 for kw in self.brand_keywords:
+                    normalized_kw = normalize_for_typo(kw)
+                    if normalized_kw in normalized_domain:
+                        found_brand_kw.add(kw) # Store the original keyword found
 
-            # Final determination
-            if risk_score >= 50: # Adjust threshold as needed
+                 #found_brand_kw = {kw for kw in self.brand_keywords if kw in domain_lower} # Original check
+                 is_official = domain_lower in self.official_brand_domains
+                 if found_brand_kw and not is_official:
+                     result['is_likely_typosquatting'] = True
+                     result['is_likely_phishing'] = True # Typosquatting is a form of phishing
+                     result['reasons'].append(f"Potential typosquatting: Brand keyword(s) {found_brand_kw} found in non-official domain '{result['full_domain']}'")
+                     risk_score += self.risk_increments.get("typosquatting", 50)
+
+            # Check 10: Suspicious File Extension in Path
+            suspicious_extensions = {'.exe', '.zip', '.rar', '.dmg', '.iso', '.scr', '.msi', '.bat', '.sh'}
+            path_lower = parsed.path.lower()
+            found_ext = {ext for ext in suspicious_extensions if path_lower.endswith(ext)}
+            if found_ext:
+                result['reasons'].append(f"URL path ends with suspicious extension(s): {found_ext}")
+                risk_score += self.risk_increments.get("suspicious_extension", 50) * len(found_ext) # Updated default
+
+            # Final assessment
+            # Check against a defined threshold (e.g., 50 based on test expectation)
+            if risk_score >= 50:
                 result['is_suspicious'] = True
-                
-            # Assign risk level based on score
-            if risk_score >= 80:
-                result['risk_level'] = 'high'
-            elif risk_score >= 50:
-                result['risk_level'] = 'medium'
-            elif risk_score >= 20:
-                result['risk_level'] = 'low'
-            else:
-                result['risk_level'] = 'minimal'
-                
             result['risk_score'] = risk_score
             
         except Exception as e:
-            self.logger.error(f"Error analyzing URL {url}: {e}")
+            self.logger.error(f"Error analyzing URL '{url}': {e}", exc_info=True)
+            result['is_suspicious'] = True # Mark as suspicious on error
             result['reasons'].append(f"Analysis error: {e}")
-            result['is_suspicious'] = True # Treat analysis errors as suspicious
-            result['risk_score'] = 100 # Max risk score on error
-            result['risk_level'] = 'error'
+            result['risk_score'] = self.risk_increments.get("invalid_structure", 100) # High risk on error
             
         return result
     
-    def scan_text(self, text: str) -> Dict[str, Any]:
+    def detect(self, data: str) -> DetectionResult:
         """
-        Scan text for URLs and analyze each one.
+        Detects and analyzes URLs within the input text.
         
         Args:
-            text: Text to scan
+            data: The input string to analyze.
             
         Returns:
-            Dictionary with scan results
+            A dictionary containing the analysis results:
+            {
+                'text': original_input_text,
+                'detected_urls_count': number_of_urls_found,
+                'suspicious_urls_count': number_of_suspicious_urls,
+                'max_risk_score': highest_risk_score_found,
+                'urls_analysis': [ list_of_analysis_dicts_for_each_url ]
+            }
         """
-        urls = self.extract_urls(text)
-        
-        results: Dict[str, Any] = {
-            'url_count': len(urls),
-            'urls': [],
-            'has_suspicious_urls': False,
-            'highest_risk_score': 0,
-            'highest_risk_url': None,
+        if not isinstance(data, str):
+             self.logger.warning("URLDetector detect method received non-string input.")
+             return {
+                 'text': data, 'detected_urls_count': 0, 'suspicious_urls_count': 0,
+                 'max_risk_score': 0, 'urls_analysis': []
+             }
+
+        extracted_urls = self._extract_urls(data)
+        analysis_results = []
+        suspicious_count = 0
+        max_risk = 0
+
+        for url in extracted_urls:
+            analysis = self._analyze_url(url)
+            analysis_results.append(analysis)
+            if analysis.get('is_suspicious', False):
+                suspicious_count += 1
+            max_risk = max(max_risk, analysis.get('risk_score', 0))
+
+        return {
+            'text': data,
+            'detected_urls_count': len(extracted_urls),
+            'suspicious_urls_count': suspicious_count,
+            'max_risk_score': max_risk,
+            'urls_analysis': analysis_results
         }
-        
-        for url in urls:
-            analysis = self.analyze_url(url)
-            results['urls'].append(analysis)
-            
-            if analysis['is_suspicious']:
-                results['has_suspicious_urls'] = True
-                
-            if analysis.get('risk_score', 0) > results['highest_risk_score']:
-                results['highest_risk_score'] = analysis['risk_score']
-                results['highest_risk_url'] = url
-        
-        return results
-    
-    def redact_urls(self, text: str, threshold: int = 30, replacement: str = "[URL REDACTED]") -> Tuple[str, Dict[str, Any]]:
-        """
-        Redact suspicious URLs from text.
-        
-        Args:
-            text: Text to scan and redact
-            threshold: Risk score threshold for redaction
-            replacement: Text to replace redacted URLs with
-            
-        Returns:
-            Tuple of (redacted text, scan results)
-        """
-        redacted_text = text
-        scan_results = self.scan_text(text)
-        
-        # Sort URLs by length in descending order to prevent partial replacements
-        urls_to_redact = [(url['url'], url) for url in scan_results['urls'] if url.get('risk_score', 0) >= threshold]
-        urls_to_redact.sort(key=lambda x: len(x[0]), reverse=True)
-        
-        # Track which URLs were redacted
-        redacted_urls = []
-        
-        for url, analysis in urls_to_redact:
-            if url in redacted_text:
-                redacted_text = redacted_text.replace(url, replacement)
-                redacted_urls.append(analysis)
-        
-        scan_results['redacted_count'] = len(redacted_urls)
-        scan_results['redacted_urls'] = redacted_urls
-        
-        return redacted_text, scan_results
-    
-    def get_ip_from_hostname(self, hostname: str) -> Optional[str]:
-        """
-        Get IP address for a hostname.
-        
-        Args:
-            hostname: The hostname to resolve
-            
-        Returns:
-            IP address as string or None if resolution failed
-        """
-        try:
-            return socket.gethostbyname(hostname)
-        except socket.gaierror:
-            return None
-    
-    def is_private_ip(self, ip: str) -> bool:
-        """
-        Check if an IP address is private.
-        
-        Args:
-            ip: IP address to check
-            
-        Returns:
-            True if the IP is private, False otherwise
-        """
-        try:
-            ip_obj = ipaddress.ip_address(ip)
-            return ip_obj.is_private
-        except ValueError:
-            return False 
+
+    # --- Helper Methods (Potentially useful but not part of core detector) ---
+    # Removed get_ip_from_hostname and is_private_ip for brevity,
+    # can be added back if needed for specific checks.

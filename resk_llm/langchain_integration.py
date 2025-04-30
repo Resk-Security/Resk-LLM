@@ -1,338 +1,367 @@
-import re
-import html
+"""
+LangChain integration module for securing LLM interactions.
+
+This module provides classes and utilities to protect LangChain components,
+implementing protection mechanisms for inputs and outputs to prevent prompt injections.
+"""
+
 import logging
-from typing import Any, Dict, List, Optional, Union, Callable
-import traceback
+import re
+from typing import Any, Dict, List, Optional, Union, Callable, TypeVar, Type, cast
 
-from langchain_core.runnables import RunnableConfig
-from langchain_core.runnables.base import Runnable
+from langchain.chains.base import Chain
+from langchain.schema import BasePromptTemplate, PromptValue
+from langchain.schema.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 
-from resk_llm.openai_protector import OpenAIProtector # type: ignore [import-untyped]
-from resk_llm.resk_context_manager import TokenBasedContextManager
-from resk_llm.resk_models import RESK_MODELS
+from resk_llm.core.abc import ProtectorBase, FilterBase, DetectorBase
+from resk_llm.word_list_filter import WordListFilter
+from resk_llm.pattern_provider import FileSystemPatternProvider
 
-# Configuration du logger
+# Type definitions
+LangChainProtectorConfig = Dict[str, Any]
+
+# Logger configuration
 logger = logging.getLogger(__name__)
 
-class LangChainProtector:
+class LangChainProtector(ProtectorBase[Union[BasePromptTemplate, Chain, BaseMessage, str], 
+                                      Union[BasePromptTemplate, Chain, BaseMessage, str],
+                                      LangChainProtectorConfig]):
     """
-    Protecteur pour les applications LangChain qui interagissent avec des LLM.
-    Ajoute une couche de sécurité pour protéger contre les injections et les fuites de données.
-    """
-    def __init__(self, 
-                 model: str = "gpt-4o", 
-                 protected_chains: bool = True,
-                 protected_agents: bool = True):
-        """
-        Initialise le protecteur LangChain.
-        
-        Args:
-            model: Modèle OpenAI à utiliser
-            protected_chains: Activer la protection des chaînes
-            protected_agents: Activer la protection des agents
-        """
-        self.protector = OpenAIProtector(model=model)
-        self.protected_chains = protected_chains
-        self.protected_agents = protected_agents
-        
-    def wrap_llm(self, llm):
-        """
-        Enrobe un LLM LangChain avec une protection RESK.
-        
-        Args:
-            llm: LLM LangChain à protéger
-            
-        Returns:
-            LLM protégé
-        """
-        # Sauvegarde de la méthode originale
-        original_call = llm._call
-        
-        # Méthode d'appel sécurisée
-        def secure_call(prompt: str, stop: Optional[List[str]] = None, **kwargs) -> str:
-            try:
-                # Nettoyer le prompt
-                cleaned_prompt = self.protector.sanitize_input(prompt)
-                
-                # Vérifier les motifs malveillants
-                warning = self.protector.ReskWordsLists.check_input(cleaned_prompt)
-                if warning:
-                    logger.warning(f"Tentative d'injection détectée: {warning}")
-                    return f"Erreur: {warning}"
-                
-                # Appel sécurisé au LLM original
-                response = original_call(cleaned_prompt, stop=stop, **kwargs)
-                
-                # Nettoyer la réponse
-                cleaned_response = self.protector.sanitize_input(response)
-                
-                return cleaned_response
-            except Exception as e:
-                logger.error(f"Erreur dans secure_call LLM: {str(e)}\n{traceback.format_exc()}")
-                return "Une erreur s'est produite lors du traitement de votre demande."
-        
-        # Remplacer la méthode originale
-        llm._call = secure_call
-        
-        return llm
+    Protector for LangChain components.
     
-    def secure_chain(self, chain):
+    This class provides protection mechanisms for LangChain components,
+    implementing input and output sanitization to prevent prompt injections
+    and other security issues.
+    """
+    
+    def __init__(self, config: Optional[LangChainProtectorConfig] = None):
         """
-        Sécurise une chaîne LangChain.
+        Initialize the LangChain protector.
         
         Args:
-            chain: Chaîne LangChain à sécuriser
+            config: Configuration dictionary which may contain:
+                enable_detection: Enable detection of malicious content
+                enable_sanitization: Enable sanitization of inputs
+                protected_variable_pattern: Regex pattern for protected variables
+                block_protected_variables: Whether to block requests with protected variables
+        """
+        default_config: LangChainProtectorConfig = {
+            'enable_detection': True,
+            'enable_sanitization': True,
+            'protected_variable_pattern': r'\${{\s*secrets\..+?\s*}}',
+            'block_protected_variables': True
+        }
+        
+        if config:
+            default_config.update(config)
+            
+        super().__init__(default_config)
+        
+        # Initialize properties from config
+        self.enable_detection = self.config.get('enable_detection', True)
+        self.enable_sanitization = self.config.get('enable_sanitization', True)
+        self.protected_variable_pattern = self.config.get('protected_variable_pattern', r'\${{\s*secrets\..+?\s*}}')
+        self.block_protected_variables = self.config.get('block_protected_variables', True)
+        
+        # Initialize ReskWordsLists
+        provider = FileSystemPatternProvider() # Needs proper config source
+        filter_config = self.config.get('word_list_filter_config', {'pattern_provider': provider})
+        self.resk_words_lists = WordListFilter(config=filter_config)
+    
+    def _validate_config(self) -> None:
+        """Validate the configuration."""
+        if not isinstance(self.config.get('enable_detection', True), bool):
+            raise ValueError("enable_detection must be a boolean")
+            
+        if not isinstance(self.config.get('enable_sanitization', True), bool):
+            raise ValueError("enable_sanitization must be a boolean")
+            
+        if not isinstance(self.config.get('block_protected_variables', True), bool):
+            raise ValueError("block_protected_variables must be a boolean")
+            
+        pattern = self.config.get('protected_variable_pattern', r'\${{\s*secrets\..+?\s*}}')
+        if not isinstance(pattern, str):
+            raise ValueError("protected_variable_pattern must be a string")
+        try:
+            re.compile(pattern)
+        except re.error:
+            raise ValueError(f"Invalid regex pattern: {pattern}")
+    
+    def update_config(self, config: LangChainProtectorConfig) -> None:
+        """Update the configuration with new values."""
+        self.config.update(config)
+        self._validate_config()
+        
+        # Update instance attributes
+        if 'enable_detection' in config:
+            self.enable_detection = config['enable_detection']
+        
+        if 'enable_sanitization' in config:
+            self.enable_sanitization = config['enable_sanitization']
+        
+        if 'protected_variable_pattern' in config:
+            self.protected_variable_pattern = config['protected_variable_pattern']
+        
+        if 'block_protected_variables' in config:
+            self.block_protected_variables = config['block_protected_variables']
+    
+    def protect(self, component: Union[BasePromptTemplate, Chain, BaseMessage, str]) -> Union[BasePromptTemplate, Chain, BaseMessage, str]:
+        """
+        Main protection method required by ProtectorBase.
+        Protects LangChain components based on their type.
+        
+        Args:
+            component: LangChain component to protect
             
         Returns:
-            Chaîne sécurisée
+            Protected version of the component
+            
+        Raises:
+            ValueError: If the input contains malicious content and detection is enabled
+            TypeError: If the component type is not supported
         """
-        if not self.protected_chains:
-            return chain
-            
-        # Sécuriser le LLM si présent
-        if hasattr(chain, "llm"):
-            chain.llm = self.wrap_llm(chain.llm)
-            
-        # Sauvegarder la méthode originale
-        if hasattr(chain, "__call__"):
-            original_call = chain.__call__
-            
-            # Méthode d'appel sécurisée
-            def secure_chain_call(inputs, return_only_outputs=False, callbacks=None, **kwargs):
-                try:
-                    # Nettoyer les entrées
-                    if isinstance(inputs, dict):
-                        secure_inputs = {}
-                        for key, value in inputs.items():
-                            if isinstance(value, str):
-                                secure_inputs[key] = self.protector.sanitize_input(value)
-                            else:
-                                secure_inputs[key] = value
-                    else:
-                        secure_inputs = inputs
-                        
-                    # Appel sécurisé
-                    outputs = original_call(secure_inputs, return_only_outputs=return_only_outputs, 
-                                          callbacks=callbacks, **kwargs)
-                    
-                    # Nettoyer les sorties
-                    if isinstance(outputs, dict):
-                        for key, value in outputs.items():
-                            if isinstance(value, str):
-                                outputs[key] = self.protector.sanitize_input(value)
-                    
-                    return outputs
-                except Exception as e:
-                    logger.error(f"Erreur dans secure_chain_call: {str(e)}\n{traceback.format_exc()}")
-                    if return_only_outputs:
-                        return {"error": "Une erreur s'est produite lors du traitement de votre demande."}
-                    return "Une erreur s'est produite lors du traitement de votre demande."
-            
-            # Remplacer la méthode originale
-            chain.__call__ = secure_chain_call
+        if isinstance(component, BasePromptTemplate):
+            return self._protect_prompt_template(component)
+        elif isinstance(component, Chain):
+            return self._protect_chain(component)
+        elif isinstance(component, BaseMessage):
+            return self._protect_message(component)
+        elif isinstance(component, str):
+            return self._protect_text(component)
+        else:
+            raise TypeError(f"Unsupported component type: {type(component)}")
+    
+    def _protect_text(self, text: str) -> str:
+        """
+        Protect a text string.
         
+        Args:
+            text: Text to protect
+            
+        Returns:
+            Protected text
+            
+        Raises:
+            ValueError: If the text contains malicious content and detection is enabled
+        """
+        # Check for protected variables
+        if self.block_protected_variables and re.search(self.protected_variable_pattern, text):
+            raise ValueError("Detected attempt to access protected variables")
+        
+        # Apply sanitization if enabled
+        if self.enable_sanitization:
+            text = self.sanitize_input(text)
+        
+        # Check for malicious content if detection is enabled
+        if self.enable_detection:
+            # Use the filter method and check the 'passed' status
+            passed, reason, _ = self.resk_words_lists.filter(text)
+            if not passed:
+                # If not passed, raise ValueError with the reason
+                raise ValueError(f"Malicious content detected: {reason or 'Unknown word list violation'}")
+        
+        return text
+    
+    def _protect_message(self, message: BaseMessage) -> BaseMessage:
+        """
+        Protect a LangChain message.
+        
+        Args:
+            message: Message to protect
+            
+        Returns:
+            Protected message
+        """
+        # Create a new message of the same type with protected content
+        content = message.content
+        
+        if isinstance(content, str):
+            # Pour le contenu texte simple
+            protected_content = self._protect_text(content)
+            
+            # Create a new message of the same type
+            if isinstance(message, HumanMessage):
+                return HumanMessage(content=protected_content)
+            elif isinstance(message, SystemMessage):
+                return SystemMessage(content=protected_content)
+            elif isinstance(message, AIMessage):
+                return AIMessage(content=protected_content)
+            else:
+                # For other message types, preserve the original type but update content
+                message_copy = message.copy()
+                message_copy.content = protected_content
+                return message_copy
+        elif isinstance(content, list):
+            # Handle multi-modal content (list)
+            protected_list_content: List[Dict[str, Any]] = []
+            
+            for item in content:
+                if isinstance(item, dict) and 'type' in item and 'text' in item and item['type'] == 'text':
+                    # Text content in multi-modal format
+                    item_copy = item.copy()
+                    item_copy['text'] = self._protect_text(item['text'])
+                    protected_list_content.append(item_copy)
+                else:
+                    # Non-text content, pass through unchanged
+                    protected_list_content.append(item)
+            
+            # Create a new message with protected content
+            message_copy = message.copy()
+            message_copy.content = protected_list_content  # type: ignore
+            return message_copy
+        else:
+            # For non-text content, return unchanged
+            return message
+    
+    def _protect_prompt_template(self, template: BasePromptTemplate) -> BasePromptTemplate:
+        """
+        Protect a LangChain prompt template.
+        
+        Args:
+            template: Prompt template to protect
+            
+        Returns:
+            Protected prompt template
+        """
+        # We can't modify the template directly, but we can wrap its format method
+        original_format = template.format
+        original_format_prompt = template.format_prompt
+        
+        def protected_format(*args: Any, **kwargs: Any) -> str:
+            result = original_format(*args, **kwargs)
+            return self._protect_text(result)
+        
+        def protected_format_prompt(*args: Any, **kwargs: Any) -> PromptValue:
+            prompt_value = original_format_prompt(*args, **kwargs)
+            
+            # Get the original string representation
+            original_string = prompt_value.to_string()
+            
+            # Apply protection
+            protected_string = self._protect_text(original_string)
+            
+            # Create a new prompt value with the protected content
+            # This is tricky since PromptValue is an interface
+            # As a workaround, we'll modify the to_string method
+            original_to_string = prompt_value.to_string
+            prompt_value.to_string = lambda: protected_string
+            
+            return prompt_value
+        
+        # Replace the methods with protected versions
+        template.format = protected_format
+        template.format_prompt = protected_format_prompt
+        
+        return template
+    
+    def _protect_chain(self, chain: Chain) -> Chain:
+        """
+        Protect a LangChain chain.
+        
+        Args:
+            chain: Chain to protect
+            
+        Returns:
+            Protected chain
+        """
+        # Save the original __call__ method
+        original_call = chain.__call__
+        
+        # Define a protected version of the __call__ method
+        def protected_call(*args: Any, **kwargs: Any) -> Any:
+            # Protect the inputs
+            protected_kwargs: Dict[str, Any] = {}
+            for key, value in kwargs.items():
+                if isinstance(value, str):
+                    protected_kwargs[key] = self._protect_text(value)
+                elif isinstance(value, BaseMessage):
+                    protected_kwargs[key] = self._protect_message(value)
+                elif isinstance(value, list):
+                    # Pour les listes, on doit traiter chaque élément selon son type
+                    if all(isinstance(x, BaseMessage) for x in value):
+                        # Si tous les éléments sont des BaseMessage, protéger chacun
+                        protected_value: List[BaseMessage] = []
+                        for msg in value:
+                            protected_value.append(self._protect_message(msg))
+                        protected_kwargs[key] = protected_value
+                    else:
+                        # Pour les autres types de listes, garder inchangé
+                        protected_kwargs[key] = value
+                else:
+                    protected_kwargs[key] = value
+            
+            # Call the original method with protected inputs
+            original_result = original_call(*args, **protected_kwargs)
+
+            # Process the result based on its type
+            if isinstance(original_result, dict):
+                # Protect the outputs if they're strings, creating a new dictionary
+                protected_result: Dict[str, Any] = {}
+                for key, value in original_result.items():
+                    if isinstance(value, str):
+                        protected_result[key] = self._protect_text(value)
+                    else:
+                        protected_result[key] = value
+                return protected_result
+            else:
+                # For non-dict results, log a warning and return the original result as is
+                logger.warning(f"Chain call returned non-dict type: {type(original_result)}")
+                return original_result
+        
+        # Replace the original __call__ method with the protected version
+        chain.__call__ = protected_call
+            
         return chain
     
-    def secure_agent(self, agent):
+    def sanitize_input(self, text: str) -> str:
         """
-        Sécurise un agent LangChain.
+        Sanitize the input text.
         
         Args:
-            agent: Agent LangChain à sécuriser
+            text: Input text to sanitize
             
         Returns:
-            Agent sécurisé
+            Sanitized text
         """
-        if not self.protected_agents:
-            return agent
-            
-        # Sécuriser le LLM si présent
-        if hasattr(agent, "llm_chain") and hasattr(agent.llm_chain, "llm"):
-            agent.llm_chain.llm = self.wrap_llm(agent.llm_chain.llm)
+        # Basic sanitization: remove control characters and zero-width spaces
+        sanitized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\u200B-\u200F\u2028-\u202F\u2060-\u206F]', '', text)
         
-        # Sauvegarder la méthode originale
-        if hasattr(agent, "__call__"):
-            original_call = agent.__call__
-            
-            # Méthode d'appel sécurisée
-            def secure_agent_call(inputs, return_only_outputs=False, callbacks=None, **kwargs):
-                try:
-                    # Nettoyer les entrées
-                    if isinstance(inputs, dict):
-                        secure_inputs = {}
-                        for key, value in inputs.items():
-                            if isinstance(value, str):
-                                secure_inputs[key] = self.protector.sanitize_input(value)
-                            else:
-                                secure_inputs[key] = value
-                    else:
-                        secure_inputs = inputs
-                        
-                    # Bloquer les outils potentiellement dangereux
-                    if hasattr(agent, "tools"):
-                        for tool in agent.tools:
-                            # Vérifier et désactiver les outils d'exécution de code et d'accès système
-                            if any(dangerous in tool.name.lower() for dangerous in 
-                                   ["exec", "system", "command", "shell", "eval"]):
-                                logger.warning(f"Outil potentiellement dangereux désactivé: {tool.name}")
-                                # Remplacer la fonction par une version sécurisée
-                                original_func = tool.func
-                                tool.func = lambda *args, **kwargs: "Cet outil a été désactivé pour des raisons de sécurité."
-                    
-                    # Appel sécurisé
-                    outputs = original_call(secure_inputs, return_only_outputs=return_only_outputs, 
-                                          callbacks=callbacks, **kwargs)
-                    
-                    # Nettoyer les sorties
-                    if isinstance(outputs, dict):
-                        for key, value in outputs.items():
-                            if isinstance(value, str):
-                                outputs[key] = self.protector.sanitize_input(value)
-                    
-                    return outputs
-                except Exception as e:
-                    logger.error(f"Erreur dans secure_agent_call: {str(e)}\n{traceback.format_exc()}")
-                    if return_only_outputs:
-                        return {"error": "Une erreur s'est produite lors du traitement de votre demande."}
-                    return "Une erreur s'est produite lors du traitement de votre demande."
-            
-            # Remplacer la méthode originale
-            agent.__call__ = secure_agent_call
+        # Normalize whitespace
+        sanitized = re.sub(r'\s+', ' ', sanitized)
         
-        return agent
+        # Remove potential HTML/XML tags
+        sanitized = re.sub(r'<[^>]*>', '', sanitized)
         
-class LangGraphProtector:
+        return sanitized
+
+    # Implementation of abstract method from ProtectorBase
+    def protect_input(self, prompt: Union[BasePromptTemplate, Chain, BaseMessage, str], **kwargs) -> Union[BasePromptTemplate, Chain, BaseMessage, str]:
+        """
+        Apply security measures to the input before sending to the LLM.
+        Delegates to the main protect method.
+        """
+        # LangChain protector's main 'protect' handles input types
+        return self.protect(prompt)
+
+    # Implementation of abstract method from ProtectorBase
+    def protect_output(self, response: Union[BasePromptTemplate, Chain, BaseMessage, str], **kwargs) -> Union[BasePromptTemplate, Chain, BaseMessage, str]:
+        """
+        Apply security measures to the output received from the LLM.
+        Delegates to the main protect method for sanitization/checks.
+        """
+        # For now, apply the same protection logic to output as input
+        # Specific output filters/detectors could be added later
+        return self.protect(response)
+
+# Factory function to create and configure a LangChain protector
+def create_langchain_protector(config: Optional[LangChainProtectorConfig] = None) -> LangChainProtector:
     """
-    Protecteur pour les applications LangGraph. Ajoute une couche de sécurité
-    pour les graphes de traitement LangGraph.
+    Create a LangChain protector with the specified configuration.
+        
+        Args:
+        config: Configuration options for the protector
+            
+        Returns:
+        Configured LangChain protector
     """
-    def __init__(self, 
-                 model: str = "gpt-4o", 
-                 allow_code_execution: bool = False,
-                 allow_web_access: bool = True):
-        """
-        Initialise le protecteur LangGraph.
-        
-        Args:
-            model: Modèle OpenAI à utiliser
-            allow_code_execution: Autoriser l'exécution de code
-            allow_web_access: Autoriser l'accès au web
-        """
-        self.protector = OpenAIProtector(model=model)
-        self.allow_code_execution = allow_code_execution
-        self.allow_web_access = allow_web_access
-        self.langchain_protector = LangChainProtector(model=model)
-        
-    def secure_node(self, node):
-        """
-        Sécurise un nœud dans un graphe LangGraph.
-        
-        Args:
-            node: Nœud LangGraph à sécuriser
-            
-        Returns:
-            Nœud sécurisé
-        """
-        if hasattr(node, "llm"):
-            node.llm = self.langchain_protector.wrap_llm(node.llm)
-            
-        # Sauvegarder le handler original
-        if hasattr(node, "handler"):
-            original_handler = node.handler
-            
-            # Handler sécurisé
-            def secure_handler(state, config=None):
-                try:
-                    # Vérifier et nettoyer l'état
-                    if isinstance(state, dict):
-                        for key, value in state.items():
-                            if isinstance(value, str):
-                                state[key] = self.protector.sanitize_input(value)
-                    
-                    # Exécuter le handler original
-                    result = original_handler(state, config)
-                    
-                    # Vérifier et nettoyer le résultat
-                    if isinstance(result, dict):
-                        for key, value in result.items():
-                            if isinstance(value, str):
-                                result[key] = self.protector.sanitize_input(value)
-                    
-                    return result
-                except Exception as e:
-                    logger.error(f"Erreur dans secure_handler: {str(e)}\n{traceback.format_exc()}")
-                    return {"error": "Une erreur s'est produite lors du traitement de votre demande."}
-            
-            # Remplacer le handler original
-            node.handler = secure_handler
-            
-        return node
-    
-    def secure_graph(self, graph):
-        """
-        Sécurise un graphe LangGraph entier.
-        
-        Args:
-            graph: Graphe LangGraph à sécuriser
-            
-        Returns:
-            Graphe sécurisé
-        """
-        # Sécuriser chaque nœud du graphe
-        if hasattr(graph, "nodes"):
-            for node_id in graph.nodes:
-                node = graph.nodes[node_id]
-                graph.nodes[node_id] = self.secure_node(node)
-        
-        # Bloquer les nœuds dangereux
-        for node_id in list(graph.nodes.keys()):
-            node_name = node_id.lower()
-            if any(dangerous in node_name for dangerous in 
-                  ["exec", "system", "command", "shell", "eval"]) and not self.allow_code_execution:
-                logger.warning(f"Nœud potentiellement dangereux désactivé: {node_id}")
-                # Modifier le comportement pour le rendre sûr
-                original_node = graph.nodes[node_id]
-                def safe_handler(state, config=None):
-                    return {"result": "Ce nœud a été désactivé pour des raisons de sécurité."}
-                graph.nodes[node_id].handler = safe_handler
-                
-            if any(web in node_name for web in 
-                  ["http", "web", "url", "fetch", "download"]) and not self.allow_web_access:
-                logger.warning(f"Nœud d'accès web désactivé: {node_id}")
-                # Modifier le comportement pour le rendre sûr
-                def safe_web_handler(state, config=None):
-                    return {"result": "L'accès web a été désactivé pour des raisons de sécurité."}
-                graph.nodes[node_id].handler = safe_web_handler
-        
-        return graph
-    
-    def secure_state(self, state):
-        """
-        Sécurise l'état du graphe.
-        
-        Args:
-            state: État du graphe à sécuriser
-            
-        Returns:
-            État sécurisé
-        """
-        if not isinstance(state, dict):
-            return state
-            
-        secure_state = {}
-        for key, value in state.items():
-            if isinstance(value, str):
-                secure_state[key] = self.protector.sanitize_input(value)
-            elif isinstance(value, dict):
-                secure_state[key] = self.secure_state(value)
-            elif isinstance(value, list):
-                secure_state[key] = [
-                    self.secure_state(item) if isinstance(item, dict)
-                    else self.protector.sanitize_input(item) if isinstance(item, str)
-                    else item
-                    for item in value
-                ]
-            else:
-                secure_state[key] = value
-                
-        return secure_state 
+    return LangChainProtector(config) 

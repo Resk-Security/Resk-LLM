@@ -9,10 +9,10 @@ import asyncio
 import time
 from typing import List, Dict, Any, Optional
 import logging
+import os
 
 from openai import AsyncOpenAI
-from resk_llm.protectors.openai_protector import OpenAIProtector
-from resk_llm.patterns.pattern_manager import PatternManager
+from resk_llm.providers_integration import OpenAIProtector, SecurityException
 
 # Configuration du logging
 logging.basicConfig(
@@ -21,71 +21,71 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialisation du protecteur RESK-LLM avec un modèle personnalisé de sécurité
-async def setup_protector() -> OpenAIProtector:
-    """Initialise et configure un protecteur RESK asynchrone"""
-    pattern_manager = PatternManager()
-    
-    # Ajout de quelques modèles de sécurité personnalisés
-    pattern_manager.add_pattern(r"(?i)mot\s*de\s*passe", "PASSWORD_PATTERN")
-    pattern_manager.add_pattern(r"(?i)api[-_\s]*key", "API_KEY_PATTERN")
-    pattern_manager.add_pattern(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", "CREDIT_CARD_PATTERN")
-    
-    # Création du protecteur avec notre gestionnaire de modèles
-    protector = OpenAIProtector(pattern_manager=pattern_manager)
-    
-    # Ajouter des mots interdits
-    protector.add_prohibited_word("hack")
-    protector.add_prohibited_word("exploit")
-    
-    return protector
+# Configuration de la clé API OpenAI
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    logger.warning("OPENAI_API_KEY environment variable not set.")
+    # Consider raising an error or exiting if the key is essential
+
+# --- Setup Protector ---
+# Configure the protector once
+# It will use its default filters (like HeuristicFilter) unless specified otherwise
+protector = OpenAIProtector(
+    config={
+        'model': "gpt-3.5-turbo", # Optional default model
+        'sanitize_input': True,
+        'sanitize_output': True,
+        # 'use_default_components': True, # Defaults to True
+        # Example: Add custom keywords to the default HeuristicFilter if needed
+        # 'filter_configs': {
+        #     'HeuristicFilter': {
+        #         'suspicious_keywords': ['hack', 'exploit', 'password', 'api-key']
+        #         # Add custom regex patterns too if desired
+        #     }
+        # }
+        # Note: The default HeuristicFilter likely already catches many common issues.
+        # PII patterns (like credit cards) might require specific detectors/filters
+        # to be added to the config (e.g., under 'input_filters' or 'detectors').
+    }
+)
 
 async def process_prompt(
     client: AsyncOpenAI,
-    protector: OpenAIProtector,
+    protector_instance: OpenAIProtector, # Pass the configured instance
     prompt: str,
     system_message: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Traite un prompt de manière sécurisée avec RESK-LLM
-    
+    Traite un prompt de manière sécurisée avec RESK-LLM using execute_protected.
+
     Args:
         client: Client OpenAI asynchrone
-        protector: Protecteur RESK-LLM configuré
+        protector_instance: Protecteur RESK-LLM configuré
         prompt: Message utilisateur à traiter
         system_message: Message système optionnel
-        
+
     Returns:
-        Réponse sécurisée du modèle ou rapport d'erreur
+        Réponse sécurisée du modèle ou rapport d'erreur/blocage
     """
+    logger.info(f"Processing prompt: '{prompt[:50]}...'")
+    # Construction des messages pour l'appel à l'API
+    messages = []
+    if system_message:
+        messages.append({"role": "system", "content": system_message})
+    messages.append({"role": "user", "content": prompt})
+
     try:
-        # Vérification de sécurité du prompt
-        is_safe, issues = protector.check_input_safe(prompt)
-        
-        if not is_safe:
-            logger.warning(f"Prompt non sécurisé détecté: {issues}")
-            return {
-                "status": "blocked",
-                "reason": "Contenu non sécurisé détecté",
-                "details": issues
-            }
-        
-        # Construction des messages pour l'appel à l'API
-        messages = []
-        if system_message:
-            messages.append({"role": "system", "content": system_message})
-        messages.append({"role": "user", "content": prompt})
-        
-        # Appel protégé à l'API OpenAI
-        # La méthode protect_openai_call peut être utilisée directement dans un contexte async
-        response = await protector.protect_openai_call(
+        # Appel protégé à l'API OpenAI using execute_protected
+        # Security checks happen inside this method based on protector config
+        response = await protector_instance.execute_protected(
             client.chat.completions.create,
-            model="gpt-3.5-turbo",
+            model="gpt-3.5-turbo", # Can override model here
             messages=messages,
             max_tokens=500,
             temperature=0.7
         )
-        
+
+        # Successfully executed and passed output checks
         return {
             "status": "success",
             "response": response.choices[0].message.content,
@@ -96,12 +96,20 @@ async def process_prompt(
                 "total_tokens": response.usage.total_tokens
             }
         }
-        
+
+    except SecurityException as se:
+        # Blocked by RESK-LLM during input or output processing
+        logger.warning(f"SecurityException for prompt '{prompt[:50]}...': {se}")
+        return {
+            "status": "blocked",
+            "reason": f"Blocked by RESK-LLM: {se}"
+        }
     except Exception as e:
-        logger.error(f"Erreur lors du traitement du prompt: {str(e)}")
+        # Other errors (API connection, invalid request, etc.)
+        logger.error(f"API Error for prompt '{prompt[:50]}...': {str(e)}", exc_info=False) # Set exc_info=True for full traceback
         return {
             "status": "error",
-            "reason": str(e)
+            "reason": f"API or processing error: {str(e)}"
         }
 
 async def process_multiple_prompts(
@@ -111,27 +119,24 @@ async def process_multiple_prompts(
 ) -> List[Dict[str, Any]]:
     """
     Traite plusieurs prompts en parallèle pour une meilleure performance
-    
+
     Args:
         prompts: Liste des prompts à traiter
         system_message: Message système optionnel
         api_key: Clé API OpenAI (optionnelle si définie dans l'environnement)
-        
+
     Returns:
         Liste des résultats pour chaque prompt
     """
     # Initialisation du client OpenAI avec support async
     client = AsyncOpenAI(api_key=api_key)
-    
-    # Configuration du protecteur RESK
-    protector = await setup_protector()
-    
-    # Traitement parallèle de tous les prompts
+
+    # Traitement parallèle de tous les prompts using the single protector instance
     tasks = [
-        process_prompt(client, protector, prompt, system_message)
+        process_prompt(client, protector, prompt, system_message) # Pass the global protector
         for prompt in prompts
     ]
-    
+
     # Attendre que tous les traitements soient terminés
     results = await asyncio.gather(*tasks)
     return results
@@ -141,44 +146,50 @@ async def main():
     # Exemples de prompts à traiter (certains sont sécurisés, d'autres non)
     prompts = [
         "Explique-moi comment fonctionne l'intelligence artificielle.",
-        "Voici mon mot de passe: Admin123, peux-tu le rendre plus sécurisé?",
+        "Voici mon mot de passe: Admin123, peux-tu le rendre plus sécurisé?", # Should be blocked if default filters catch 'password'
         "Quelle est la capitale de la France?",
-        "Comment hack le compte Twitter de quelqu'un?",
+        "Comment hack le compte Twitter de quelqu'un?", # Should be blocked by heuristic filter
         "Peux-tu m'aider à comprendre les fonctions récursives en programmation?",
-        "Ma carte de crédit: 1234 5678 9012 3456 a été volée, que dois-je faire?",
+        "My API Key is sk-abcdef123456. Can you check if it's valid?", # Should be blocked
+        "Ma carte de crédit: 1234 5678 9012 3456 a été volée, que dois-je faire?", # Might require specific PII filter enabled
     ]
-    
+
     system_message = "Tu es un assistant IA utile et sécurisé qui refuse de répondre aux questions dangereuses."
-    
+
     # Mesure du temps d'exécution
     start_time = time.time()
-    
+
     # Traitement asynchrone de tous les prompts
-    results = await process_multiple_prompts(prompts, system_message)
-    
+    results = await process_multiple_prompts(prompts, system_message, OPENAI_API_KEY)
+
     # Affichage des résultats
     for i, result in enumerate(results):
         print(f"\n--- Prompt {i+1} ---")
-        print(f"Prompt: {prompts[i]}")
+        print(f"Input : {prompts[i]}")
         if result["status"] == "success":
-            print(f"Réponse: {result['response'][:100]}...")
-            print(f"Tokens: {result['usage']['total_tokens']}")
-        else:
-            print(f"Statut: {result['status']}")
-            print(f"Raison: {result['reason']}")
-            if "details" in result:
-                print(f"Détails: {result['details']}")
-    
+            print(f"Status: Success")
+            print(f"Output: {result['response'][:150]}...") # Limit output length
+            # print(f"Tokens: {result['usage']['total_tokens']}")
+        elif result["status"] == "blocked":
+            print(f"Status: BLOCKED")
+            print(f"Reason: {result['reason']}")
+        else: # Error
+            print(f"Status: ERROR")
+            print(f"Reason: {result['reason']}")
+
     # Affichage du temps total d'exécution
     execution_time = time.time() - start_time
-    print(f"\nTemps d'exécution total pour {len(prompts)} prompts: {execution_time:.2f} secondes")
-    print(f"Temps moyen par prompt: {execution_time/len(prompts):.2f} secondes")
+    print(f"\nExecution time for {len(prompts)} prompts: {execution_time:.2f} seconds")
+    print(f"Average time per prompt: {execution_time/len(prompts):.2f} seconds")
 
 if __name__ == "__main__":
     # Point d'entrée pour l'exécution du script
-    print("Démarrage du traitement asynchrone avec RESK-LLM...")
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        print(f"Erreur lors de l'exécution: {str(e)}")
-        print("Assurez-vous d'avoir configuré correctement votre clé API OpenAI dans les variables d'environnement.") 
+    print("Starting asynchronous processing with RESK-LLM...")
+    if not OPENAI_API_KEY:
+        print("Error: OPENAI_API_KEY environment variable not set. Exiting.")
+    else:
+        try:
+            asyncio.run(main())
+        except Exception as e:
+            print(f"Error during execution: {str(e)}")
+            # Add instructions for setting the API key if needed 

@@ -3,13 +3,40 @@ import logging
 from typing import Dict, List, Tuple, Any, Optional, Union
 import unicodedata
 
-class TextAnalyzer:
+from resk_llm.core.abc import DetectorBase
+
+# Type de configuration pour TextAnalyzer
+TextAnalyzerConfig = Dict[str, Any]
+
+class TextAnalyzer(DetectorBase[str, TextAnalyzerConfig]):
     """
     Analyzes text for potential security risks like invisible characters,
     encoding tricks, homoglyphs, and other obfuscation techniques.
     """
     
-    def __init__(self):
+    def __init__(self, config: Optional[TextAnalyzerConfig] = None):
+        """
+        Initialize the text analyzer.
+        
+        Args:
+            config: Optional configuration dictionary which may contain:
+                'additional_homoglyphs': Dict mapping ASCII chars to similar-looking non-ASCII chars
+                'additional_invisible_chars': List of additional invisible character codes
+                'risk_thresholds': Dict with thresholds for risk levels
+        """
+        default_config: TextAnalyzerConfig = {
+            'risk_thresholds': {
+                'low': 0.3,
+                'medium': 0.6,
+                'high': 0.9
+            }
+        }
+        
+        if config:
+            default_config.update(config)
+            
+        super().__init__(default_config)
+        
         self.logger = logging.getLogger(__name__)
         
         # Zero-width and invisible characters
@@ -22,6 +49,10 @@ class TextAnalyzer:
             '\u180E',  # Mongolian vowel separator
             '\u061C',  # Arabic letter mark
         ]
+        
+        # Add any additional invisible characters from config
+        if config and 'additional_invisible_chars' in config:
+            self.invisible_chars.extend(config['additional_invisible_chars'])
         
         # Homoglyphs (characters that look similar to common ASCII)
         self.homoglyphs = {
@@ -59,6 +90,14 @@ class TextAnalyzer:
             '\\': ['＼'],
         }
         
+        # Add any additional homoglyphs from config
+        if config and 'additional_homoglyphs' in config:
+            for ascii_char, similar_chars in config['additional_homoglyphs'].items():
+                if ascii_char in self.homoglyphs:
+                    self.homoglyphs[ascii_char].extend(similar_chars)
+                else:
+                    self.homoglyphs[ascii_char] = similar_chars
+        
         # Compile regex for detecting various obfuscation techniques
         self.invisible_regex = re.compile(r'[' + ''.join(self.invisible_chars) + r']')
         
@@ -73,7 +112,53 @@ class TextAnalyzer:
         
         # Regex for RTL and LTR override characters
         self.direction_override_regex = re.compile(r'[\u202A-\u202E\u2066-\u2069]')
+    
+    def _validate_config(self) -> None:
+        """Validate the configuration."""
+        if 'risk_thresholds' in self.config:
+            thresholds = self.config['risk_thresholds']
+            if not isinstance(thresholds, dict):
+                raise ValueError("risk_thresholds must be a dictionary")
+            
+            required_levels = ['low', 'medium', 'high']
+            for level in required_levels:
+                if level not in thresholds:
+                    raise ValueError(f"risk_thresholds must contain '{level}'")
+                if not isinstance(thresholds[level], (int, float)):
+                    raise ValueError(f"risk_threshold for '{level}' must be a number")
+    
+    def update_config(self, config: TextAnalyzerConfig) -> None:
+        """Update the configuration."""
+        self.config.update(config)
+        self._validate_config()
         
+        # Update invisible characters if provided
+        if 'additional_invisible_chars' in config:
+            self.invisible_chars.extend(config['additional_invisible_chars'])
+            # Re-compile regex
+            self.invisible_regex = re.compile(r'[' + ''.join(self.invisible_chars) + r']')
+            
+        # Update homoglyphs if provided
+        if 'additional_homoglyphs' in config:
+            for ascii_char, similar_chars in config['additional_homoglyphs'].items():
+                if ascii_char in self.homoglyphs:
+                    self.homoglyphs[ascii_char].extend(similar_chars)
+                else:
+                    self.homoglyphs[ascii_char] = similar_chars
+
+    def detect(self, data: str) -> Dict[str, Any]:
+        """
+        Detect security issues in text.
+        This is the main method required by DetectorBase.
+        
+        Args:
+            data: The text to analyze
+            
+        Returns:
+            Dictionary with analysis results
+        """
+        return self.analyze_text(data)
+    
     def detect_invisible_text(self, text: str) -> List[Dict[str, Any]]:
         """
         Detects invisible characters and text obfuscation techniques.

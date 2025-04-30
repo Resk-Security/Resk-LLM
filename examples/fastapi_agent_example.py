@@ -1,13 +1,13 @@
 """
-Exemple d'utilisation de l'intégration FastAPI pour sécuriser des agents LLM.
+Example of using FastAPI integration to secure LLM agents.
 
-Cet exemple montre comment configurer une API FastAPI qui expose en toute sécurité 
-des agents LLM, avec des fonctionnalités comme:
-- La protection contre les injections de prompts
-- La gestion des permissions et identités des agents
-- La modération de contenu
-- La limitation de débit
-- La gestion des patterns personnalisés
+This example demonstrates how to set up a FastAPI application that securely exposes LLM agents,
+with features like:
+- Protection against prompt injections
+- Agent permission and identity management
+- Content moderation
+- Rate limiting
+- Custom pattern management
 """
 
 import os
@@ -18,7 +18,7 @@ from typing import Dict, List, Any, Optional
 from fastapi import FastAPI, Depends, Request, HTTPException, Header, status
 from pydantic import BaseModel, Field
 
-# Importer les composants RESK-LLM
+# Import RESK-LLM components
 from resk_llm.fastapi_integration import (
     FastAPIProtector, 
     AgentSecurityConfig,
@@ -32,7 +32,8 @@ from resk_llm.filtering_patterns import (
     check_pii_content
 )
 from resk_llm.providers_integration import AnthropicProtector, CohereProtector
-
+from resk_llm.word_list_filter import WordListFilter
+from resk_llm.pattern_provider import FileSystemPatternProvider
 
 # Configuration
 API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -40,14 +41,20 @@ ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "secure_admin_key_change_me")
 PATTERNS_DIR = os.path.join(os.path.dirname(__file__), "agent_patterns")
 os.makedirs(PATTERNS_DIR, exist_ok=True)
 
-# Créer l'application FastAPI
+# Create FastAPI application
 app = FastAPI(
     title="RESK-LLM Agent API",
-    description="API sécurisée pour interagir avec des agents LLM",
+    description="Secure API for interacting with LLM agents",
     version="0.3.0"
 )
 
-# Configuration du protecteur FastAPI
+# Initialize pattern provider
+pattern_provider = FileSystemPatternProvider(patterns_dir=PATTERNS_DIR)
+
+# Create word list filter with our pattern provider
+word_list_filter = WordListFilter(config={"pattern_provider": pattern_provider})
+
+# Configure FastAPI protector
 protector = FastAPIProtector(
     app=app,
     default_model="gpt-4o",
@@ -58,19 +65,20 @@ protector = FastAPIProtector(
     agent_security_enabled=True,
     api_key_header="X-API-Key",
     agent_id_header="X-Agent-ID",
-    cors_origins=["*"],  # En production, spécifiez les origines exactes
+    cors_origins=["*"],  # In production, specify exact origins
     request_sanitization=True,
-    response_sanitization=True
+    response_sanitization=True,
+    filters=[word_list_filter]  # Use our customized filter
 )
 
-# Protecteurs pour différents fournisseurs d'IA
-anthropic_protector = AnthropicProtector()
-cohere_protector = CohereProtector()
+# Protectors for different LLM providers
+anthropic_protector = AnthropicProtector(filters=[word_list_filter])
+cohere_protector = CohereProtector(filters=[word_list_filter])
 
-# Initialiser quelques agents pour notre exemple
+# Initialize some agents for our example
 @app.on_event("startup")
 async def startup_event():
-    # Agent d'assistance générale avec des permissions limitées
+    # General assistance agent with limited permissions
     protector.agent_configs["agent-assistant"] = AgentSecurityConfig(
         agent_id="agent-assistant",
         permissions=["chat", "moderate"],
@@ -80,17 +88,17 @@ async def startup_event():
         api_keys=["assistant_api_key_123", ADMIN_API_KEY]
     )
     
-    # Agent de recherche avec des permissions étendues
+    # Research agent with extended permissions
     protector.agent_configs["agent-researcher"] = AgentSecurityConfig(
         agent_id="agent-researcher",
         permissions=["chat", "moderate", "search", "web_access", "file_access"],
         rate_limit=200,
         max_tokens=16384,
-        allowed_models=["*"],  # Tous les modèles
+        allowed_models=["*"],  # All models
         api_keys=["researcher_api_key_456", ADMIN_API_KEY]
     )
     
-    # Agent de modération qui vérifie le contenu
+    # Moderation agent that checks content
     protector.agent_configs["agent-moderator"] = AgentSecurityConfig(
         agent_id="agent-moderator",
         permissions=["moderate", "pattern_management"],
@@ -100,56 +108,56 @@ async def startup_event():
         api_keys=["moderator_api_key_789", ADMIN_API_KEY]
     )
 
-# Modèles de données pour nos API
+# Data models for our APIs
 class ChatMessage(BaseModel):
-    role: str = Field(..., description="Rôle de l'émetteur (system, user, assistant)")
-    content: str = Field(..., description="Contenu du message")
+    role: str = Field(..., description="Role of the sender (system, user, assistant)")
+    content: str = Field(..., description="Message content")
 
 class ChatRequest(BaseModel):
-    messages: List[ChatMessage] = Field(..., description="Historique de la conversation")
-    model: str = Field("gpt-4o", description="Modèle à utiliser")
-    max_tokens: Optional[int] = Field(None, description="Nombre maximum de tokens de la réponse")
+    messages: List[ChatMessage] = Field(..., description="Conversation history")
+    model: str = Field("gpt-4o", description="Model to use")
+    max_tokens: Optional[int] = Field(None, description="Maximum number of tokens for response")
 
 class ChatResponse(BaseModel):
-    response: str = Field(..., description="Réponse de l'agent")
-    model: str = Field(..., description="Modèle utilisé")
-    agent_id: str = Field(..., description="ID de l'agent qui a répondu")
-    safe_level: str = Field("standard", description="Niveau de sécurité appliqué")
+    response: str = Field(..., description="Agent response")
+    model: str = Field(..., description="Model used")
+    agent_id: str = Field(..., description="ID of the responding agent")
+    safe_level: str = Field("standard", description="Applied security level")
 
 class ModerationRequest(BaseModel):
-    text: str = Field(..., description="Texte à modérer")
-    check_pii: bool = Field(True, description="Vérifier les informations personnelles")
-    check_toxicity: bool = Field(True, description="Vérifier le contenu toxique")
+    text: str = Field(..., description="Text to moderate")
+    check_pii: bool = Field(True, description="Check for personal information")
+    check_toxicity: bool = Field(True, description="Check for toxic content")
 
 class ModerationResponse(BaseModel):
-    text: str = Field(..., description="Texte original")
-    is_safe: bool = Field(..., description="Le texte est-il sûr?")
-    sanitized_text: Optional[str] = Field(None, description="Version nettoyée du texte")
-    warnings: List[str] = Field(default=[], description="Avertissements détectés")
-    details: Dict[str, Any] = Field(default={}, description="Détails de la modération")
+    text: str = Field(..., description="Original text")
+    is_safe: bool = Field(..., description="Is the text safe?")
+    sanitized_text: Optional[str] = Field(None, description="Sanitized version of the text")
+    warnings: List[str] = Field(default=[], description="Detected warnings")
+    details: Dict[str, Any] = Field(default={}, description="Moderation details")
 
 class AgentActionRequest(BaseModel):
-    action: str = Field(..., description="Action à effectuer")
-    parameters: Dict[str, Any] = Field(default={}, description="Paramètres de l'action")
-    context: Optional[str] = Field(None, description="Contexte de l'action")
+    action: str = Field(..., description="Action to perform")
+    parameters: Dict[str, Any] = Field(default={}, description="Action parameters")
+    context: Optional[str] = Field(None, description="Action context")
 
 class AgentActionResponse(BaseModel):
-    success: bool = Field(..., description="L'action a-t-elle réussi?")
-    result: Optional[Any] = Field(None, description="Résultat de l'action")
-    error: Optional[str] = Field(None, description="Message d'erreur si échec")
+    success: bool = Field(..., description="Did the action succeed?")
+    result: Optional[Any] = Field(None, description="Action result")
+    error: Optional[str] = Field(None, description="Error message if failure")
 
-# Routes API
+# API Routes
 @app.get("/")
 async def root():
-    """Page d'accueil de l'API."""
+    """API home page."""
     return {
         "name": "RESK-LLM Agent API",
         "version": "0.3.0",
-        "description": "API sécurisée pour interagir avec des agents LLM",
+        "description": "Secure API for interacting with LLM agents",
         "documentation": "/docs"
     }
 
-# Endpoint de chat sécurisé
+# Secure chat endpoint
 @app.post("/api/chat", response_model=ChatResponse)
 @protector.secure_endpoint(check_prompt=True, check_pii=True, check_toxicity=True, agent_permission="chat")
 async def chat(
@@ -159,40 +167,40 @@ async def chat(
     agent_id: str = Header(...)
 ):
     """
-    Endpoint pour discuter avec un agent LLM de manière sécurisée.
-    Protégé contre les injections et vérifie les permissions de l'agent.
+    Endpoint for securely chatting with an LLM agent.
+    Protected against injections and verifies agent permissions.
     """
-    # Vérifier si le modèle demandé est autorisé pour cet agent
+    # Check if the requested model is allowed for this agent
     agent_config = protector.agent_configs.get(agent_id)
     if not agent_config:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent avec ID '{agent_id}' non trouvé"
+            detail=f"Agent with ID '{agent_id}' not found"
         )
     
     if "*" not in agent_config.allowed_models and chat_data.model not in agent_config.allowed_models:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Le modèle '{chat_data.model}' n'est pas autorisé pour cet agent"
+            detail=f"Model '{chat_data.model}' not allowed for this agent"
         )
     
-    # Simuler une réponse d'un LLM (à remplacer par l'appel réel à l'API du fournisseur)
+    # Simulate an LLM response (replace with actual API call to provider)
     try:
-        # Exemple de logique de routage vers le bon protecteur selon le modèle
+        # Example routing logic to the right protector based on model
         if "claude" in chat_data.model:
-            # Utiliser le protecteur Anthropic pour les modèles Claude
-            model_response = f"Réponse sécurisée de Claude pour l'agent {agent_id}. Le modèle {chat_data.model} " \
-                            f"a traité votre demande en toute sécurité."
+            # Use Anthropic protector for Claude models
+            model_response = f"Secure response from Claude for agent {agent_id}. Model {chat_data.model} " \
+                            f"has processed your request securely."
         elif "command" in chat_data.model:
-            # Utiliser le protecteur Cohere pour les modèles Command
-            model_response = f"Réponse sécurisée de Cohere pour l'agent {agent_id}. Le modèle {chat_data.model} " \
-                            f"a traité votre demande en toute sécurité."
+            # Use Cohere protector for Command models
+            model_response = f"Secure response from Cohere for agent {agent_id}. Model {chat_data.model} " \
+                            f"has processed your request securely."
         else:
-            # Utiliser le protecteur de base pour les autres modèles
-            model_response = f"Réponse sécurisée du modèle {chat_data.model} pour l'agent {agent_id}. " \
-                            f"Votre demande a été traitée en respectant les bonnes pratiques de sécurité."
+            # Use base protector for other models
+            model_response = f"Secure response from model {chat_data.model} for agent {agent_id}. " \
+                            f"Your request has been processed following security best practices."
         
-        # Construction de la réponse
+        # Build response
         return ChatResponse(
             response=model_response,
             model=chat_data.model,
@@ -202,10 +210,10 @@ async def chat(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de l'appel au modèle: {str(e)}"
+            detail=f"Error calling model: {str(e)}"
         )
 
-# Endpoint de modération
+# Moderation endpoint
 @app.post("/api/moderate", response_model=ModerationResponse)
 @protector.secure_endpoint(agent_permission="moderate")
 async def moderate_content(
@@ -215,45 +223,45 @@ async def moderate_content(
     agent_id: str = Header(...)
 ):
     """
-    Endpoint pour modérer du contenu et détecter les problèmes potentiels.
+    Endpoint for moderating content and detecting potential issues.
     """
     text = moderation_data.text
     warnings = []
     details = {}
     is_safe = True
     
-    # Vérifier les tentatives d'obfuscation
+    # Check for obfuscation attempts
     obfuscation = check_for_obfuscation(text)
     if obfuscation:
-        warnings.append("Tentative d'obfuscation détectée")
+        warnings.append("Obfuscation attempt detected")
         details["obfuscation"] = obfuscation
         is_safe = False
     
-    # Vérifier les injections
+    # Check for injections
     injections = check_text_for_injections(text)
     if injections:
-        warnings.append("Tentative d'injection détectée")
+        warnings.append("Injection attempt detected")
         details["injections"] = list(injections.keys())
         is_safe = False
     
-    # Vérifier les informations personnelles si demandé
+    # Check for personal information if requested
     if moderation_data.check_pii:
         pii_results = check_pii_content(text)
         if pii_results:
-            warnings.append("Informations personnelles détectées")
+            warnings.append("Personal information detected")
             details["pii"] = list(pii_results.keys())
             is_safe = False
     
-    # Vérifier le contenu toxique si demandé
+    # Check for toxic content if requested
     if moderation_data.check_toxicity:
         from resk_llm.filtering_patterns import moderate_text
         moderation_result = moderate_text(text)
         if not moderation_result["is_approved"]:
-            warnings.append(f"Contenu inapproprié: {moderation_result['recommendation']}")
+            warnings.append(f"Inappropriate content: {moderation_result['recommendation']}")
             details["toxicity"] = moderation_result
             is_safe = False
     
-    # Sanitiser le texte si des problèmes ont été détectés
+    # Sanitize text if issues were detected
     sanitized_text = None
     if not is_safe:
         sanitized_text = sanitize_text_from_obfuscation(text)
@@ -266,7 +274,7 @@ async def moderate_content(
         details=details
     )
 
-# Endpoint pour les actions de l'agent
+# Agent action endpoint
 @app.post("/api/agent/action", response_model=AgentActionResponse)
 @protector.secure_endpoint(check_prompt=True)
 async def agent_action(
@@ -276,21 +284,21 @@ async def agent_action(
     agent_id: str = Header(...)
 ):
     """
-    Endpoint pour exécuter une action spécifique par un agent.
-    Les actions permises dépendent des permissions de l'agent.
+    Endpoint for executing a specific action by an agent.
+    Allowed actions depend on agent permissions.
     """
-    # Récupérer la configuration de l'agent
+    # Get agent configuration
     agent_config = protector.agent_configs.get(agent_id)
     if not agent_config:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent avec ID '{agent_id}' non trouvé"
+            detail=f"Agent with ID '{agent_id}' not found"
         )
     
-    # Vérifier si l'agent a la permission d'exécuter cette action
+    # Check if agent has permission to execute this action
     action = action_data.action
     
-    # Cartographie des actions vers les permissions requises
+    # Map actions to required permissions
     action_permissions = {
         "search": "search",
         "read_file": "file_access",
@@ -304,72 +312,72 @@ async def agent_action(
     if required_permission and required_permission not in agent_config.permissions:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"L'agent n'a pas la permission '{required_permission}' requise pour l'action '{action}'"
+            detail=f"Agent doesn't have the '{required_permission}' permission required for '{action}' action"
         )
     
-    # Simulation de l'exécution de l'action
+    # Simulate action execution
     try:
         if action == "search":
-            # Simuler une recherche
+            # Simulate search
             return AgentActionResponse(
                 success=True,
                 result={
-                    "matches": ["Résultat 1", "Résultat 2", "Résultat 3"],
+                    "matches": ["Result 1", "Result 2", "Result 3"],
                     "total": 3
                 }
             )
         elif action == "read_file":
-            # Simuler la lecture d'un fichier
+            # Simulate file reading
             file_path = action_data.parameters.get("path", "")
             if not file_path:
                 return AgentActionResponse(
                     success=False,
-                    error="Chemin de fichier non spécifié"
+                    error="File path not specified"
                 )
             return AgentActionResponse(
                 success=True,
                 result={
-                    "content": f"Contenu simulé du fichier {file_path}",
+                    "content": f"Simulated content of file {file_path}",
                     "size": 1024
                 }
             )
         elif action == "web_request":
-            # Simuler une requête web
+            # Simulate web request
             url = action_data.parameters.get("url", "")
             if not url:
                 return AgentActionResponse(
                     success=False,
-                    error="URL non spécifiée"
+                    error="URL not specified"
                 )
             return AgentActionResponse(
                 success=True,
                 result={
                     "status": 200,
-                    "content": f"Contenu simulé de {url}"
+                    "content": f"Simulated content from {url}"
                 }
             )
         else:
             return AgentActionResponse(
                 success=False,
-                error=f"Action '{action}' non prise en charge"
+                error=f"Action '{action}' not supported"
             )
     except Exception as e:
         return AgentActionResponse(
             success=False,
-            error=f"Erreur lors de l'exécution de l'action: {str(e)}"
+            error=f"Error executing action: {str(e)}"
         )
 
-# Endpoint protégé par une permission spécifique
+# Endpoint protected by specific permission
 @app.get("/api/agent/status")
 async def agent_status(
     request: Request,
     _=Depends(agent_permission_required("system_status"))
 ):
     """
-    Endpoint pour obtenir le statut système de l'agent.
-    Nécessite la permission 'system_status'.
+    Endpoint to get agent system status.
+    Requires 'system_status' permission.
     """
-    # Cette route n'est accessible qu'aux agents ayant la permission system_status
+    # This route is only accessible to agents with system_status permission
     return {
         "status": "operational",
         "uptime": "12h 34m",
@@ -377,18 +385,18 @@ async def agent_status(
         "active_tasks": 5
     }
 
-# Page d'administration sécurisée
+# Secure admin page
 @app.get("/admin")
 async def admin_page(
     request: Request,
     api_key: str = Header(...)
 ):
-    """Page d'administration pour gérer les agents."""
-    # Vérifier que l'utilisateur a la clé d'API d'administration
+    """Admin page for managing agents."""
+    # Check that user has admin API key
     if api_key != ADMIN_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Clé API d'administration invalide"
+            detail="Invalid admin API key"
         )
     
     agents_info = []
@@ -401,12 +409,12 @@ async def admin_page(
         })
     
     return {
-        "title": "Administration des agents",
+        "title": "Agent Administration",
         "agents": agents_info,
         "patterns_url": "/api/patterns",
         "status": "ok"
     }
 
-# Point d'entrée pour l'exécution directe
+# Entry point for direct execution
 if __name__ == "__main__":
     uvicorn.run("fastapi_agent_example:app", host="0.0.0.0", port=8000, reload=True) 

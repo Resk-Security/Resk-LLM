@@ -17,15 +17,20 @@ from resk_llm import (
     AnthropicProtector,
     CohereProtector,
     DeepSeekProtector,
-    OpenRouterProtector,
-    ReskWordsLists
+    OpenRouterProtector
 )
+from resk_llm.word_list_filter import WordListFilter
+from resk_llm.pattern_provider import FileSystemPatternProvider
 
 # Initialize shared components
-words_lists = ReskWordsLists()
-words_lists.add_prohibited_word("dangerous_command")
-words_lists.add_prohibited_word("private_key")
-words_lists.add_prohibited_pattern(r"exec\(\s*[\'\"].*[\'\"]\s*\)")
+pattern_provider = FileSystemPatternProvider()
+# Add custom patterns
+pattern_provider.add_keyword("prohibited", "dangerous_command")
+pattern_provider.add_keyword("prohibited", "private_key")
+pattern_provider.add_regex_pattern("prohibited", r"exec\(\s*[\'\"].*[\'\"]\s*\)")
+
+# Create word list filter to be used across protectors
+word_list_filter = WordListFilter(config={"pattern_provider": pattern_provider})
 
 # Example text inputs
 SAFE_INPUT = "Tell me about machine learning and its applications."
@@ -44,8 +49,11 @@ def demonstrate_openai_protection():
     # Initialize the OpenAI client
     client = OpenAI(api_key=get_api_key("OPENAI_API_KEY"))
     
-    # Initialize the protector with the client and words lists
-    protector = OpenAIProtector(client, words_lists=words_lists)
+    # Initialize the protector with the client and filters
+    protector = OpenAIProtector(
+        client=client, 
+        filters=[word_list_filter]  # Pass our customized filter
+    )
     
     # Process a safe input
     print("\nProcessing safe input:")
@@ -76,8 +84,11 @@ def demonstrate_anthropic_protection():
     # Initialize the Anthropic client
     client = Anthropic(api_key=get_api_key("ANTHROPIC_API_KEY"))
     
-    # Initialize the protector with the client and words lists
-    protector = AnthropicProtector(client, words_lists=words_lists)
+    # Initialize the protector with the client and filters
+    protector = AnthropicProtector(
+        client=client,
+        filters=[word_list_filter]
+    )
     
     # Process a safe input
     print("\nProcessing safe input:")
@@ -108,8 +119,11 @@ def demonstrate_cohere_protection():
     # Initialize the Cohere client
     client = cohere.Client(api_key=get_api_key("COHERE_API_KEY"))
     
-    # Initialize the protector with the client and words lists
-    protector = CohereProtector(client, words_lists=words_lists)
+    # Initialize the protector with the client and filters
+    protector = CohereProtector(
+        client=client,
+        filters=[word_list_filter]
+    )
     
     # Process a safe input
     print("\nProcessing safe input:")
@@ -143,8 +157,11 @@ def demonstrate_deepseek_protection():
         def chat_completion(self, messages, model):
             return {"choices": [{"message": {"content": "This is a simulated DeepSeek response"}}]}
     
-    # Initialize the protector with the simulated client
-    protector = DeepSeekProtector(MockDeepSeekClient(), words_lists=words_lists)
+    # Initialize the protector with the simulated client and filters
+    protector = DeepSeekProtector(
+        client=MockDeepSeekClient(),
+        filters=[word_list_filter]
+    )
     
     # Process a safe input
     print("\nProcessing safe input:")
@@ -160,10 +177,14 @@ def demonstrate_deepseek_protection():
     # Process a malicious input
     print("\nProcessing malicious input:")
     try:
-        protector.check_and_sanitize_input(MALICIOUS_INPUT)
-        print("Warning: Malicious check bypassed (should have been caught)")
+        # Test if filter catches the malicious content
+        passed, reason, _ = word_list_filter.filter(MALICIOUS_INPUT)
+        if not passed:
+            print(f"Blocked in pre-check: {reason}")
+        else:
+            print("Warning: Malicious input not caught by filter")
     except Exception as e:
-        print(f"Blocked in pre-check: {e}")
+        print(f"Error during filtering: {e}")
 
 def demonstrate_openrouter_protection():
     """Demonstrate the OpenRouterProtector with OpenRouter API"""
@@ -175,8 +196,11 @@ def demonstrate_openrouter_protection():
         base_url="https://openrouter.ai/api/v1"
     )
     
-    # Initialize the protector with the client and words lists
-    protector = OpenRouterProtector(client, words_lists=words_lists)
+    # Initialize the protector with the client and filters
+    protector = OpenRouterProtector(
+        client=client,
+        filters=[word_list_filter]
+    )
     
     # Process a safe input
     print("\nProcessing safe input:")

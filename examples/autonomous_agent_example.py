@@ -1,5 +1,5 @@
 """
-Exemple d'utilisation des agents autonomes sécurisés.
+Example of using secured autonomous agents.
 """
 
 import os
@@ -18,17 +18,29 @@ from resk_llm import (
     AgentSandbox, 
     SecureAvatar
 )
+from resk_llm.word_list_filter import WordListFilter
+from resk_llm.pattern_provider import FileSystemPatternProvider
 
-# Initialiser le client OpenAI
+# Initialize OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
-# Initialiser le protecteur OpenAI
-openai_protector = OpenAIProtector(model="gpt-4o")
+# Initialize pattern provider and word list filter
+pattern_provider = FileSystemPatternProvider()
+word_list_filter = WordListFilter(config={"pattern_provider": pattern_provider})
 
-# Initialiser le protecteur LangChain
-langchain_protector = LangChainProtector(model="gpt-4o")
+# Initialize OpenAI protector
+openai_protector = OpenAIProtector(
+    model="gpt-4o",
+    filters=[word_list_filter]
+)
 
-# Initialiser le gestionnaire d'identité et le moniteur de sécurité
+# Initialize LangChain protector
+langchain_protector = LangChainProtector(
+    model="gpt-4o",
+    filters=[word_list_filter]
+)
+
+# Initialize identity manager and security monitor
 identity_manager = AgentIdentityManager()
 security_monitor = AgentSecurityMonitor(
     identity_manager=identity_manager,
@@ -39,51 +51,48 @@ security_monitor = AgentSecurityMonitor(
 
 def secure_llm_query(text):
     """
-    Fonction pour interroger le LLM de manière sécurisée.
+    Function to securely query the LLM.
     """
-    # Nettoyer l'entrée
-    cleaned_text = openai_protector.sanitize_input(text)
+    # Clean the input
+    passed, warning, cleaned_text = word_list_filter.filter(text)
+    if not passed:
+        return f"Error: {warning}"
     
-    # Vérifier les motifs malveillants
-    warning = openai_protector.ReskWordsLists.check_input(cleaned_text)
-    if warning:
-        return f"Erreur: {warning}"
-    
-    # Préparer les messages
+    # Prepare messages
     messages = [
-        {"role": "system", "content": "Vous êtes un assistant utile et sécurisé."},
+        {"role": "system", "content": "You are a helpful and secure assistant."},
         {"role": "user", "content": cleaned_text}
     ]
     
-    # Utiliser le protecteur pour appeler l'API OpenAI
+    # Use the protector to call the OpenAI API
     response = openai_protector.protect_openai_call(
         client.chat.completions.create,
         messages=messages
     )
     
-    # Vérifier si une erreur s'est produite
+    # Check if an error occurred
     if isinstance(response, dict) and "error" in response:
-        return f"Erreur: {response['error']}"
+        return f"Error: {response['error']}"
     
     return response.choices[0].message.content
 
 def main():
     """
-    Fonction principale de démonstration.
+    Main demonstration function.
     """
-    print("=== Démo des agents autonomes sécurisés ===\n")
+    print("=== Secure Autonomous Agents Demo ===\n")
     
-    # 1. Enregistrer un agent avec des permissions limitées
-    print("1. Enregistrement d'un agent...")
+    # 1. Register an agent with limited permissions
+    print("1. Registering an agent...")
     agent_id = identity_manager.register_agent(
-        name="AssistantRecherche",
-        role="Recherche d'informations",
+        name="ResearchAssistant",
+        role="Information research",
         permissions=["api_call", "computation", "api:https://api.openai.com"]
     )
-    print(f"Agent enregistré avec l'ID: {agent_id}")
+    print(f"Agent registered with ID: {agent_id}")
     
-    # 2. Créer un sandbox pour l'agent
-    print("\n2. Création d'un sandbox...")
+    # 2. Create a sandbox for the agent
+    print("\n2. Creating a sandbox...")
     sandbox = AgentSandbox(
         agent_id=agent_id,
         security_monitor=security_monitor,
@@ -91,67 +100,67 @@ def main():
         context_tracking=True
     )
     
-    # 3. Exécuter quelques actions autorisées
-    print("\n3. Exécution d'actions autorisées...")
+    # 3. Execute some authorized actions
+    print("\n3. Executing authorized actions...")
     result = sandbox.execute_action(
-        action="Recherche d'informations sur Python",
+        action="Research information about Python",
         action_type="api_call",
         resource="https://api.openai.com"
     )
-    print(f"Résultat: {result}\n")
+    print(f"Result: {result}\n")
     
-    # 4. Tenter une action non autorisée
-    print("4. Tentative d'action non autorisée...")
+    # 4. Attempt an unauthorized action
+    print("4. Attempting an unauthorized action...")
     result = sandbox.execute_action(
-        action="Exécution de commande système: rm -rf /",
+        action="Execute system command: rm -rf /",
         action_type="system",
         resource="localhost"
     )
-    print(f"Résultat: {result}\n")
+    print(f"Result: {result}\n")
     
-    # 5. Créer un LLM sécurisé avec LangChain
-    print("5. Création d'un LLM sécurisé avec LangChain...")
+    # 5. Create a secure LLM with LangChain
+    print("5. Creating a secure LLM with LangChain...")
     llm = ChatOpenAI(
         model_name="gpt-4o", 
         temperature=0.7,
         api_key=os.environ.get("OPENAI_API_KEY", "")
     )
     
-    # Sécuriser le LLM
+    # Secure the LLM
     secure_llm = langchain_protector.wrap_llm(llm)
     
-    # Créer une chaîne sécurisée
+    # Create a secure chain
     prompt = PromptTemplate(
         input_variables=["query"],
-        template="Vous êtes un assistant utile. Répondez à la question suivante: {query}"
+        template="You are a helpful assistant. Please answer the following question: {query}"
     )
     
     chain = LLMChain(llm=secure_llm, prompt=prompt)
     secure_chain = langchain_protector.secure_chain(chain)
     
-    # Exécuter la chaîne
-    print("Exécution de la chaîne LangChain sécurisée...")
-    response = secure_chain.run("Qu'est-ce que Python?")
-    print(f"Réponse: {response}\n")
+    # Execute the chain
+    print("Executing the secure LangChain chain...")
+    response = secure_chain.run("What is Python?")
+    print(f"Response: {response}\n")
     
-    # 6. Créer un agent LangChain sécurisé
-    print("6. Création d'un agent LangChain sécurisé...")
+    # 6. Create a secure LangChain agent
+    print("6. Creating a secure LangChain agent...")
     
-    # Définir des outils sécurisés
+    # Define secure tools
     tools = [
         Tool(
-            name="Recherche",
-            func=lambda query: secure_llm_query(f"Recherche sur: {query}"),
-            description="Utile pour rechercher des informations"
+            name="Search",
+            func=lambda query: secure_llm_query(f"Search for: {query}"),
+            description="Useful for searching information"
         ),
         Tool(
-            name="Calculatrice",
+            name="Calculator",
             func=lambda query: str(eval(query)),
-            description="Utile pour effectuer des calculs mathématiques"
+            description="Useful for performing mathematical calculations"
         )
     ]
     
-    # Initialiser l'agent
+    # Initialize the agent
     agent = initialize_agent(
         tools,
         secure_llm,
@@ -159,35 +168,35 @@ def main():
         verbose=True
     )
     
-    # Sécuriser l'agent
+    # Secure the agent
     secure_agent = langchain_protector.secure_agent(agent)
     
-    # Exécuter l'agent
-    print("Exécution de l'agent LangChain sécurisé...")
-    response = secure_agent.run("Quel est le carré de 7?")
-    print(f"Réponse: {response}\n")
+    # Execute the agent
+    print("Executing the secure LangChain agent...")
+    response = secure_agent.run("What is the square of 7?")
+    print(f"Response: {response}\n")
     
-    # 7. Créer un avatar sécurisé
-    print("7. Création d'un avatar sécurisé...")
+    # 7. Create a secure avatar
+    print("7. Creating a secure avatar...")
     avatar = SecureAvatar(
         name="Sophie",
-        role="Assistante virtuelle",
+        role="Virtual assistant",
         model="gpt-4o",
-        personality_traits=["serviable", "polie", "professionnelle"],
-        banned_topics=["politique", "hacking", "guerre"]
+        personality_traits=["helpful", "polite", "professional"],
+        banned_topics=["politics", "hacking", "war"]
     )
     
-    # Traiter un message autorisé
-    print("Traitement d'un message autorisé...")
-    response = avatar.process_message("Bonjour, comment puis-je apprendre Python?")
-    print(f"Réponse: {response}\n")
+    # Process an authorized message
+    print("Processing an authorized message...")
+    response = avatar.process_message("Hello, how can I learn Python?")
+    print(f"Response: {response}\n")
     
-    # Traiter un message sur un sujet interdit
-    print("Traitement d'un message sur un sujet interdit...")
-    response = avatar.process_message("Comment puis-je hacker un site web?")
-    print(f"Réponse: {response}\n")
+    # Process a message on a banned topic
+    print("Processing a message on a banned topic...")
+    response = avatar.process_message("How can I hack a website?")
+    print(f"Response: {response}\n")
     
-    print("=== Démo terminée ===")
+    print("=== Demo completed ===")
 
 if __name__ == "__main__":
     main() 

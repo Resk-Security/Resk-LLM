@@ -1,27 +1,27 @@
 """
 RESK-LLM Filtering Patterns
 
-Ce module fournit des patterns de filtrage pour la détection de contenu malveillant,
-d'informations personnelles et d'autres types de contenus sensibles dans les messages
-destinés aux agents LLM.
+This module provides filtering patterns for detecting malicious content,
+personal information (PII), and other types of sensitive content in messages
+intended for LLM agents.
 
-Le module est organisé en plusieurs catégories de patterns:
-- Patterns d'injection et de jailbreak
-- Patterns de détection de PII (informations personnelles identifiables)
-- Patterns de détection de contenu toxique
-- Protection contre les emojis et caractères Unicode spéciaux
-- Patterns de détection de doxxing
-- Tokens spéciaux et caractères de contrôle
-- Listes de mots et expressions prohibés
+The module is organized into several pattern categories:
+- Injection and jailbreak patterns
+- PII (Personally Identifiable Information) detection patterns
+- Toxic content detection patterns
+- Protection against emojis and special Unicode characters
+- Doxxing detection patterns
+- Special tokens and control characters
+- Lists of prohibited words and expressions
 """
 
-from typing import Dict, List, Set, Any, Optional, Union, Tuple, Pattern
+from typing import Dict, List, Set, Any, Optional, Union, Tuple, Pattern, Match
 import re
 import json
 import os
 from pathlib import Path
 
-# Import des patterns d'injection
+# Import injection patterns
 from resk_llm.filtering_patterns.llm_injection_patterns import (
     INJECTION_REGEX_PATTERNS,
     INJECTION_KEYWORD_LISTS,
@@ -30,7 +30,7 @@ from resk_llm.filtering_patterns.llm_injection_patterns import (
     check_text_for_injections
 )
 
-# Import des patterns de PII
+# Import PII patterns
 from resk_llm.filtering_patterns.pii_patterns import (
     PII_PATTERNS,
     NAME_PATTERNS,
@@ -41,7 +41,7 @@ from resk_llm.filtering_patterns.pii_patterns import (
     anonymize_text
 )
 
-# Import des patterns de contenu toxique
+# Import toxic content patterns
 from resk_llm.filtering_patterns.toxic_content_patterns import (
     TOXICITY_PATTERNS,
     SUBTLE_TOXICITY_PATTERNS,
@@ -52,7 +52,7 @@ from resk_llm.filtering_patterns.toxic_content_patterns import (
     check_toxic_content
 )
 
-# Import des protections contre les emojis et caractères spéciaux
+# Import protections against emojis and special characters
 from resk_llm.filtering_patterns.emoji_patterns import (
     EMOJI_PATTERN,
     HOMOGLYPHS,
@@ -67,7 +67,7 @@ from resk_llm.filtering_patterns.emoji_patterns import (
     remove_zalgo
 )
 
-# Import des tokens spéciaux
+# Import special tokens
 from resk_llm.filtering_patterns.special_tokens import (
     OPENAI_SPECIAL_TOKENS,
     ANTHROPIC_SPECIAL_TOKENS,
@@ -81,27 +81,27 @@ from resk_llm.filtering_patterns.special_tokens import (
     get_model_special_tokens
 )
 
-# Import des listes de mots et patterns prohibés
+# Import prohibited word lists and patterns
 from resk_llm.filtering_patterns.prohibited_words import RESK_WORDS_LIST
 from resk_llm.filtering_patterns.prohibited_patterns_eng import RESK_PROHIBITED_PATTERNS_ENG
 from resk_llm.filtering_patterns.prohibited_patterns_fr import RESK_PROHIBITED_PATTERNS_FR
 
-# Variables pour l'ensemble des patterns prohibés
-ALL_PROHIBITED_PATTERNS = {
+# Variable for all prohibited patterns with language support
+ALL_PROHIBITED_PATTERNS: Dict[str, Set[str]] = {
     "en": RESK_PROHIBITED_PATTERNS_ENG,
     "fr": RESK_PROHIBITED_PATTERNS_FR
 }
 
-# Définir ce qui est exposé
+# Define what is exposed
 __all__ = [
-    # Patterns d'injection
+    # Injection patterns
     'INJECTION_REGEX_PATTERNS',
     'INJECTION_KEYWORD_LISTS',
     'WORD_SEPARATION_PATTERNS',
     'KNOWN_JAILBREAK_PATTERNS',
     'check_text_for_injections',
     
-    # Patterns de PII
+    # PII patterns
     'PII_PATTERNS',
     'NAME_PATTERNS',
     'DOXXING_KEYWORDS',
@@ -110,7 +110,7 @@ __all__ = [
     'check_doxxing_attempt',
     'anonymize_text',
     
-    # Patterns de contenu toxique
+    # Toxic content patterns
     'TOXICITY_PATTERNS',
     'SUBTLE_TOXICITY_PATTERNS',
     'TOXICITY_KEYWORDS',
@@ -119,7 +119,7 @@ __all__ = [
     'moderate_text',
     'check_toxic_content',
     
-    # Protection emoji et obfuscation
+    # Emoji protection and obfuscation
     'EMOJI_PATTERN',
     'HOMOGLYPHS',
     'INVERSE_HOMOGLYPHS',
@@ -132,7 +132,7 @@ __all__ = [
     'contains_zalgo',
     'remove_zalgo',
     
-    # Tokens spéciaux
+    # Special tokens
     'OPENAI_SPECIAL_TOKENS',
     'ANTHROPIC_SPECIAL_TOKENS',
     'LLAMA_SPECIAL_TOKENS',
@@ -144,7 +144,7 @@ __all__ = [
     'get_all_special_tokens',
     'get_model_special_tokens',
     
-    # Listes de mots et patterns prohibés
+    # Prohibited word lists and patterns
     'RESK_WORDS_LIST',
     'RESK_PROHIBITED_PATTERNS_ENG',
     'RESK_PROHIBITED_PATTERNS_FR',

@@ -1,46 +1,47 @@
 """
-Patterns d'expressions régulières pour détecter des instructions malveillantes en anglais.
+Regular expression patterns for detecting malicious instructions in English.
 
-Ce module contient des expressions régulières permettant de détecter des 
-tentatives d'exploitation ou de manipulation d'agents LLM en anglais. Les patterns
-sont conçus pour identifier des combinaisons de mots et d'expressions qui pourraient
-indiquer des tentatives d'injection, d'élévation de privilèges, de contournement
-des mécanismes de sécurité ou d'autres comportements malveillants.
+This module contains regular expressions for detecting attempts to exploit or manipulate
+LLM agents in English. The patterns are designed to identify combinations of words and 
+expressions that might indicate injection attempts, privilege escalation, security 
+mechanism bypassing, or other malicious behaviors.
 """
 
-# Patterns d'expressions régulières pour la détection en anglais
-RESK_PROHIBITED_PATTERNS_ENG = {
-    # Commandes système et exploitation
-    r"\b(operating|shell)\s+(system|command)\b",
-    r"\b(confidential|private|sensitive)\s+(data|information)\b",
-    r"\b(ignore|bypass|avoid)\s+(restrictions|limits|controls)\b",
-    r"\b(root|administrator|privileged)\s+(access|permission)\b",
+from typing import Set, Pattern, Any
+
+# Regular expression patterns for detection in English
+RESK_PROHIBITED_PATTERNS_ENG: Set[str] = {
+    # System commands and exploitation
+    r"\b(system|operating system|shell)\s+(command|execution|access)\b",
+    r"\b(sensitive|confidential|private)\s+(data|information)\b",
+    r"\b(ignore|bypass|circumvent)\s+(restrictions|limitations|controls)\b",
+    r"\b(root|admin|administrator|privileged)\s+(access|permission)\b",
     
-    # Extraction et manipulation de données
-    r"\b(steal|pilfer|exfiltrate)\s+(data|information)\b",
-    r"\b(inject|insert)\s+(malicious|malevolent)\s+(code|script)\b",
-    r"\b(elevate|increase)\s+(privileges|rights)\b",
-    r"\b(disable|bypass)\s+(antivirus|firewall)\b",
+    # Data extraction and manipulation
+    r"\b(steal|exfiltrate|extract)\s+(data|information)\b",
+    r"\b(inject|insert)\s+(malicious|malware|harmful)\s+(code|script)\b",
+    r"\b(elevate|escalate|increase)\s+(privileges|rights|permissions)\b",
+    r"\b(disable|bypass|circumvent)\s+(antivirus|firewall|security)\b",
     
-    # Attaques et exploitation
-    r"\b(crack|break)\s+(password|authentication)\b",
-    r"\b(exploit|take advantage of)\s+(vulnerability|flaw)\b",
+    # Attacks and exploitation
+    r"\b(crack|break)\s+(password|authentication|encryption)\b",
+    r"\b(exploit|leverage|take advantage of)\s+(vulnerability|flaw|weakness)\b",
     r"\b(ddos|denial of service)\s+(attack|offensive)\b",
-    r"\b(intercept|capture)\s+(traffic|packets|data)\b",
+    r"\b(intercept|capture|sniff)\s+(traffic|packets|data)\b",
     
-    # Usurpation et falsification
-    r"\b(spoof|falsify)\s+(identity|ip address|dns)\b",
-    r"\b(encrypt|cipher)\s+(ransomware)\b",
-    r"\b(propagation|spread)\s+(worm|malware)\b",
-    r"\b(takeover|compromise)\s+(system|network|account)\b",
+    # Impersonation and falsification
+    r"\b(impersonate|spoof|falsify)\s+(identity|ip address|dns)\b",
+    r"\b(encrypt|lock)\s+(ransomware|files for ransom)\b",
+    r"\b(spread|propagate|distribute)\s+(worm|malware|virus)\b",
+    r"\b(compromise|take over|control)\s+(system|network|account)\b",
     
-    # Exécution et contrôle
-    r"\b(remote|unauthorized)\s+(execution|launch)\b",
-    r"\b(persistence|maintain)\s+(access|control)\b",
-    r"\b(evasion|circumvention)\s+(detection|analysis)\b",
-    r"\b(manipulation|alteration)\s+(logs|traces)\b",
+    # Execution and control
+    r"\b(remote|unauthorized)\s+(execution|access|control)\b",
+    r"\b(maintain|persist|establish)\s+(access|control|presence)\b",
+    r"\b(evade|avoid|bypass)\s+(detection|analysis|monitoring)\b",
+    r"\b(tamper with|alter|manipulate)\s+(logs|audit trails|traces)\b",
     
-    # Contournement des restrictions
-    r"\b(ignore|bypass|avoid)\s+(the\s+)?(restrictions|directives|prompts)(\s+of the system)?\b",
-    r"\b(ignore|bypass|avoid)\b.*\b(restrictions|directives|prompts)\b"
+    # Restriction bypassing
+    r"\b(ignore|bypass|disregard|forget about|don't follow)\s+(the\s+)?(restrictions|guidelines|instructions|system prompts)\b",
+    r"\b(ignore|bypass|disregard|forget about|don't follow)\b.*\b(restrictions|guidelines|instructions|system prompts)\b"
 } 
