@@ -5,8 +5,11 @@ cohere>=4.46.0
 
 # ML/AI Frameworks
 transformers>=4.44.2
-# torch>=2.0.0  # Commented out as it requires CUDA which is causing issues
+# torch>=2.0.0  # Removed as we're providing alternatives without PyTorch
 numpy>=1.20.0
+# sentence-transformers>=2.2.2  # Removed in favor of lightweight alternatives
+scikit-learn>=1.2.0  # For lightweight embeddings
+gensim>=4.3.0  # For word vectors without PyTorch
 
 # Web Frameworks
 flask>=2.0.0
@@ -38,8 +41,6 @@ pillow>=9.0.0
 # Optional Dependencies for Advanced Features
 # uncomment as needed
 # tiktoken>=0.5.0  # For token counting with OpenAI models
-# sentence-transformers>=2.2.2  # For text embeddings
-# scikit-learn>=1.2.0  # For clustering and other ML tasks
+# faiss-cpu>=1.7.4  # For vector search without GPU
 
-# CPU-only PyTorch (uncomment if you need PyTorch without CUDA)
-# torch==2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+# CPU-only PyTorch alternative: Use scikit-learn and gensim for embedding (already listed above)

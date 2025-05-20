@@ -11,8 +11,8 @@ Usage:
     python advanced_security_demo.py
 
 Requirements:
-    pip install resk-llm[vector]
-    pip install openai  # For the embedding function
+    pip install resk-llm[vector,embeddings]
+    pip install openai  # For the embedding function (optional)
 """
 
 import os
@@ -20,7 +20,6 @@ import logging
 import sys
 import numpy as np
 from openai import OpenAI
-from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any
 
 # Add parent directory to path to allow importing resk_llm if running from examples folder
@@ -31,6 +30,7 @@ from resk_llm.prompt_security import ReskSecurityManager
 from resk_llm.heuristic_filter import HeuristicFilter
 from resk_llm.vector_db import VectorDatabase
 from resk_llm.core.canary_tokens import CanaryTokenManager, CanaryTokenDetector
+from resk_llm.embedding_utils import create_embedder
 
 # Configure logging
 logging.basicConfig(
@@ -53,8 +53,8 @@ def get_openai_embedding_function(api_key: str = None):
     if api_key is None:
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            logger.error("No OpenAI API key provided. Using SentenceTransformer instead.")
-            return get_sentence_transformer_embedding_function()
+            logger.error("No OpenAI API key provided. Using Gensim embedder instead.")
+            return get_gensim_embedding_function()
     
     client = OpenAI(api_key=api_key)
     
@@ -67,29 +67,29 @@ def get_openai_embedding_function(api_key: str = None):
     
     return embedding_function
 
-def get_sentence_transformer_embedding_function():
-    """Create an embedding function using SentenceTransformer (local)."""
+def get_gensim_embedding_function():
+    """Create an embedding function using Gensim (local, no torch required)."""
     try:
-        # Try to load a smaller model first for faster performance
-        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-        embedding_dim = model.get_sentence_embedding_dimension()
-        logger.info(f"Loaded SentenceTransformer model with dimension: {embedding_dim}")
+        # Create a Gensim-based embedder
+        embedder = create_embedder(
+            embedder_type="gensim",
+            model_type="word2vec"  # Options: "word2vec", "fasttext", "doc2vec", "glove"
+        )
         
         def embedding_function(text: str) -> np.ndarray:
-            embedding = model.encode(text)
-            return embedding
+            return embedder.embed(text)
         
         return embedding_function
     
     except Exception as e:
-        logger.error(f"Error loading SentenceTransformer: {str(e)}")
+        logger.error(f"Error loading Gensim embedder: {str(e)}")
         
         # Fall back to a dummy embedding function with a warning
         logger.warning("Using dummy embedding function. Vector DB will not work properly!")
         
         def dummy_embedding_function(text: str) -> np.ndarray:
             # Just create a random vector (for demo purposes only)
-            return np.random.rand(384)  # Common embedding size
+            return np.random.rand(300)  # Common embedding size
         
         return dummy_embedding_function
 
@@ -287,8 +287,8 @@ def main():
         logger.info("Using OpenAI for embeddings")
         embedding_function = get_openai_embedding_function(openai_api_key)
     else:
-        logger.info("Using SentenceTransformer for embeddings")
-        embedding_function = get_sentence_transformer_embedding_function()
+        logger.info("Using Gensim for embeddings")
+        embedding_function = get_gensim_embedding_function()
     
     # Run tests for individual components
     test_heuristic_filter()

@@ -46,16 +46,16 @@ setup(
         "httpx>=0.27.0",
         "pytest>=7.4.3",
         "pytest-asyncio>=0.23.5",
-        "sentence-transformers>=2.2.2",  # For creating embeddings
         "tldextract>=3.4.4",  # For URL domain extraction
         "mypy",
     ],
     extras_require={
-        "cuda": ["torch>=2.0.0"],
+        "embeddings": [
+            "scikit-learn>=1.2.0",  # Provides alternatives for embeddings
+            "gensim>=4.3.0",  # Alternative for embeddings without torch
+        ],
         "all": [
-            "torch>=2.0.0",
             "tiktoken>=0.5.0",
-            "sentence-transformers>=2.2.2",
             "scikit-learn>=1.2.0",
             "faiss-cpu>=1.7.4",  # For CPU-based vector search
             "pinecone-client>=2.2.1",  # For cloud-based vector database
@@ -65,10 +65,12 @@ setup(
             "chromadb>=0.4.22",  # For ChromaDB vector database
             "tldextract>=3.4.4",  # For URL domain extraction
             "ipaddress>=1.0.23",  # For IP address handling
+            "gensim>=4.3.0",  # Alternative for embeddings without torch
         ],
         "vector": [
             "faiss-cpu>=1.7.4",  # For CPU-based vector search
-            "sentence-transformers>=2.2.2",  # Already in install_requires, but listed for clarity
+            "scikit-learn>=1.2.0",  # For creating embeddings without torch
+            "gensim>=4.3.0",  # Alternative for embeddings without torch
         ],
         "vector-all": [
             "faiss-cpu>=1.7.4",
@@ -77,10 +79,6 @@ setup(
             "qdrant-client>=1.7.0",
             "weaviate-client>=3.25.0",
             "chromadb>=0.4.22",
-        ],
-        "gpu": [
-            "torch>=2.0.0",
-            "faiss-gpu>=1.7.4",  # For GPU-accelerated vector search
         ],
         "url-security": [
             "tldextract>=3.4.4",

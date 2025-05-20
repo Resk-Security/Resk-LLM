@@ -87,6 +87,13 @@ from .autonomous_agent_security import (
     AGENT_DEFAULT_PERMISSIONS
 )
 
+# --- Embedding Utilities (torch-free alternatives) ---
+from .embedding_utils import (
+    GensimEmbedder,
+    SklearnEmbedder,
+    create_embedder
+)
+
 # Define the public API (organized by category)
 __all__ = [
     # Version
@@ -161,4 +168,9 @@ __all__ = [
     'AgentIdentity',
     'SecureAgentExecutor',
     'AGENT_DEFAULT_PERMISSIONS',
+    
+    # Embedding Utilities (torch-free alternatives)
+    'GensimEmbedder',
+    'SklearnEmbedder',
+    'create_embedder',
 ]

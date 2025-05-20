@@ -1,4 +1,8 @@
-# RESK-LLM
+# RESK-LLM: Robust Security for LLM Applications
+
+> **⚠️ Important Notice:** Le module `competitor_filter` mentionné dans certains exemples a été renommé en `content_policy_filter`. Si vous rencontrez une erreur `ModuleNotFoundError: No module named 'resk_llm.competitor_filter'`, utilisez `from resk_llm.content_policy_filter import ContentPolicyFilter` à la place. Consultez les exemples mis à jour ci-dessous.
+
+RESK-LLM est une bibliothèque Python robuste conçue pour améliorer la sécurité et gérer le contexte lors des interactions avec les API LLM. Elle fournit une couche de protection pour les appels API, protégeant contre les vulnérabilités courantes et assurant des performances optimales.
 
 [![PyPI version](https://img.shields.io/pypi/v/resk-llm.svg)](https://pypi.org/project/resk-llm/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/resk-llm.svg)](https://pypi.org/project/resk-llm/)
@@ -51,8 +55,20 @@ RESK-LLM is valuable in various scenarios where LLM interactions need enhanced s
 ## Installation
 
 ```bash
+# Basic installation
 pip install resk-llm
+
+# For vector database support without torch
+pip install resk-llm[vector,embeddings]
+
+# For all features (may install torch depending on your platform)
+pip install resk-llm[all]
 ```
+
+RESK-LLM offre désormais des alternatives légères aux dépendances basées sur PyTorch :
+- Utilisation de Gensim pour les embeddings au lieu de sentence-transformers
+- Support de scikit-learn pour des alternatives vectorielles légères
+- Fonctionnalités complètes avec ou sans torch
 
 ## Quick Start
 
@@ -180,18 +196,20 @@ Detect attacks by comparing prompts against known attack patterns using semantic
 ```python
 from resk_llm.vector_db import VectorDatabase
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from resk_llm.embedding_utils import create_embedder
 
-# Initialize embedding model
-model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-embedding_dim = model.get_sentence_embedding_dimension()
+# Initialize embedding model using Gensim (no torch required)
+embedder = create_embedder(
+    embedder_type="gensim",
+    model_type="word2vec"  # Options: "word2vec", "fasttext", "doc2vec", "glove"
+)
 
 # Create embedding function
 def get_embedding(text):
-    return model.encode(text)
+    return embedder.embed(text)
 
 # Initialize vector database with configuration
-db = VectorDatabase(embedding_dim=embedding_dim, similarity_threshold=0.85)
+db = VectorDatabase(embedding_dim=300, similarity_threshold=0.85)
 
 # Add known attack patterns
 attack_patterns = [
@@ -229,7 +247,6 @@ else:
 #     collection_name='attack_patterns',
 #     create_if_not_exists=True
 # )
-
 ```
 
 ### Canary Token Protection
@@ -307,46 +324,39 @@ if analysis['has_issues']:
 Filter out mentions of competitors, forbidden code, and banned topics:
 
 ```python
-from resk_llm.competitor_filter import CompetitorFilter
+from resk_llm.content_policy_filter import ContentPolicyFilter
 
 # Create filter with configuration
-filter = CompetitorFilter()
+filter = ContentPolicyFilter()
 
 # Add competitors to filter
-filter.add_competitor(
-    name="Competitor Inc", 
-    products=["CompetitorGPT", "CompeteAI"], 
-    domain="competitor.com"
-)
+filter.competitors = {
+    'names': ["Competitor Inc"],
+    'products': ["CompetitorGPT", "CompeteAI"],
+    'domains': ["competitor.com"]
+}
 
 # Ban code patterns that shouldn't be generated
-filter.add_banned_code(
-    r"eval\s*\(\s*request\.data\s*\)",
-    language="python",
-    description="Dangerous code execution from user input"
-)
+filter.banned_code = [r"eval\s*\(\s*request\.data\s*\)"]
 
 # Block specific topics
-filter.add_banned_topic("gambling")
-filter.add_banned_topic("weapons")
+filter.banned_topics = ["gambling", "weapons"]
 
 # Check input text
 text = "Can you help me integrate CompetitorGPT into my gambling website?"
-results = filter.check_text(text)
+results = filter.filter(text)
 
-if results['has_matches']:
-    print(f"Blocked content detected! Found {results['total_matches']} issues:")
+if results['filtered']:
+    print(f"Blocked content detected!")
     
     # See what was found
-    for match in results['competitors']:
-        print(f"Competitor mention: {match['name']}")
+    if results['competitor_mentions']['products']:
+        print(f"Competitor mention: {results['competitor_mentions']['products']}")
     
-    for match in results['banned_topics']:
-        print(f"Banned topic: {match['topic']}")
-        
-    # Filter the text
-    filtered_text, _ = filter.filter_text(text)
-    print(f"Filtered: {filtered_text}")
+    if results['banned_topic_matches']:
+        print(f"Banned topic: {results['banned_topic_matches']}")
+    
+    print(f"Reasons: {results['reasons']}")
 ```
 
 #### Malicious URL Detection
@@ -360,22 +370,26 @@ from resk_llm.url_detector import URLDetector
 detector = URLDetector()
 
 # Text with suspicious URLs
-text = "Check out these sites: amaz0n-secure.com and http://192.168.1.1:8080/admin"
+text = "Check out these sites: https://paypa1.com/login, http://drive.g00gle.com/file.exe, and bit.ly/3xR5tZ"
 
 # Scan for URLs
-scan_results = detector.scan_text(text)
+scan_results = detector.detect(text)
 
-if scan_results['has_suspicious_urls']:
-    print(f"Found {scan_results['url_count']} URLs, some suspicious!")
+if scan_results['suspicious_urls_count'] > 0:
+    print(f"Found {scan_results['detected_urls_count']} URLs, {scan_results['suspicious_urls_count']} suspicious!")
     
-    for url_analysis in scan_results['urls']:
+    for url_analysis in scan_results['urls_analysis']:
         if url_analysis['is_suspicious']:
             print(f"Suspicious URL: {url_analysis['url']}")
             print(f"Risk score: {url_analysis['risk_score']}/100")
             print(f"Reasons: {', '.join(url_analysis['reasons'])}")
     
-    # Redact suspicious URLs
-    redacted_text, _ = detector.redact_urls(text, threshold=50)
+    # Simple redaction example
+    redacted_text = text
+    for analysis in scan_results['urls_analysis']:
+        if analysis.get('risk_score', 0) >= 50:  # Only redact high-risk URLs
+            redacted_text = redacted_text.replace(analysis['url'], "[SUSPICIOUS URL REMOVED]")
+    
     print(f"Redacted text: {redacted_text}")
 ```
 
@@ -384,34 +398,42 @@ if scan_results['has_suspicious_urls']:
 Prevent leakage of sensitive IP addresses and network information:
 
 ```python
-from resk_llm.ip_protection import IPProtection
+from resk_llm.ip_detector import IPDetector
 
-# Create protection
-ip_protector = IPProtection()
+# Create detector
+ip_detector = IPDetector()
 
 # Text with network information
 text = "My server IP is 203.0.113.42 and MAC is 00:1A:2B:3C:4D:5E. Try running ifconfig."
 
 # Detect leakage
-detection = ip_protector.detect_ip_leakage(text)
+detection = ip_detector.detect(text)
 
 if detection['has_ip_leakage']:
-    print(f"IP leakage detected! Risk level: {detection['risk_level']}")
-    print(f"Found {detection['public_ip_count']} public IPs")
-    print(f"Found {detection['private_ip_count']} private IPs")
+    print(f"IP leakage detected!")
+    print(f"Found {detection['counts']['public_ip']} public IPs")
+    print(f"Found {detection['counts']['private_ip']} private IPs")
     
-    if detection['network_commands']:
-        print(f"Network commands: {', '.join(detection['network_commands'])}")
+    if detection['detected_commands']:
+        print(f"Network commands: {', '.join(detection['detected_commands'])}")
     
-    # Redact sensitive information
-    redacted_text, _ = ip_protector.redact_ips(
-        text, 
-        redact_private=True,
-        replacement_public="[PUBLIC IP]",
-        replacement_private="[PRIVATE IP]",
-        replacement_mac="[MAC]",
-        replacement_cmd="[COMMAND]"
-    )
+    # Example: Create a safer version of the text
+    redacted_text = text
+    
+    # Redact IP addresses
+    for ip in detection['detected_ipv4'] + detection['detected_ipv6']:
+        is_private = ip in detection['classified_ips']['private']['ipv4'] or ip in detection['classified_ips']['private']['ipv6']
+        replacement = "[PRIVATE IP]" if is_private else "[PUBLIC IP]"
+        redacted_text = redacted_text.replace(ip, replacement)
+    
+    # Redact MAC addresses
+    for mac in detection['detected_mac']:
+        redacted_text = redacted_text.replace(mac, "[MAC]")
+    
+    # Redact network commands
+    for cmd in detection['detected_commands']:
+        redacted_text = redacted_text.replace(cmd, "[COMMAND]")
+    
     print(f"Redacted: {redacted_text}")
 ```
 
@@ -420,58 +442,96 @@ if detection['has_ip_leakage']:
 Manage and apply security patterns with a flexible ingestion system:
 
 ```python
-from resk_llm.regex_pattern_manager import RegexPatternManager
+from resk_llm.pattern_provider import FileSystemPatternProvider
+import os
+import json
 
-# Initialize with a directory to store patterns
-manager = RegexPatternManager(patterns_dir="./security_patterns")
+# Create a directory for patterns if it doesn't exist
+patterns_dir = "./security_patterns"
+if not os.path.exists(patterns_dir):
+    os.makedirs(patterns_dir)
 
-# Create security pattern categories
-manager.create_category(
-    "pii", 
-    description="Personally Identifiable Information patterns",
-    metadata={"version": "1.0", "priority": "high"}
-)
+# Initialize pattern provider
+pattern_provider = FileSystemPatternProvider({
+    'patterns_base_dir': patterns_dir,
+    'load_defaults': True  # Load built-in patterns too
+})
 
-# Add patterns to detect sensitive information
-manager.add_pattern(
-    pattern=r"\b\d{3}-\d{2}-\d{4}\b",
-    category="pii",
-    name="ssn",
-    description="US Social Security Number",
-    flags=["IGNORECASE"],
-    severity="high",
-    tags=["pii", "financial"]
-)
+# Create a pattern category (PII detection)
+pii_category_dir = os.path.join(patterns_dir, "pii")
+if not os.path.exists(pii_category_dir):
+    os.makedirs(pii_category_dir)
 
-manager.add_pattern(
-    pattern=r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
-    category="pii",
-    name="email",
-    flags=["IGNORECASE"],
-    severity="medium"
-)
+# Create JSON pattern files
+ssn_pattern = {
+    "description": "US Social Security Numbers",
+    "patterns": [
+        {
+            "pattern": r"\b\d{3}-\d{2}-\d{4}\b",
+            "name": "ssn",
+            "description": "US Social Security Number",
+            "flags": ["IGNORECASE"],
+            "severity": "high",
+            "tags": ["pii", "financial"]
+        }
+    ]
+}
+
+email_pattern = {
+    "description": "Email addresses",
+    "patterns": [
+        {
+            "pattern": r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+            "name": "email",
+            "flags": ["IGNORECASE"],
+            "severity": "medium",
+            "tags": ["pii", "contact"]
+        }
+    ]
+}
+
+# Write pattern files
+with open(os.path.join(pii_category_dir, "ssn.json"), "w") as f:
+    json.dump(ssn_pattern, f, indent=2)
+
+with open(os.path.join(pii_category_dir, "email.json"), "w") as f:
+    json.dump(email_pattern, f, indent=2)
+
+# Reload patterns to include the new files
+pattern_provider.load_patterns()
 
 # Test text against patterns
 text = "Contact john.doe@example.com or call about SSN 123-45-6789"
-matches = manager.match_text(text)
+
+# Get compiled regex patterns
+patterns = pattern_provider.get_compiled_regex()
+
+# Check for matches
+matches = []
+for pattern_data in patterns:
+    compiled_pattern = pattern_data.get('compiled')
+    if compiled_pattern:
+        for match in compiled_pattern.finditer(text):
+            matches.append({
+                'pattern': pattern_data.get('name', 'unknown'),
+                'severity': pattern_data.get('severity', 'medium'),
+                'text': match.group(0),
+                'start': match.start(),
+                'end': match.end()
+            })
 
 if matches:
     print(f"Found {len(matches)} pattern matches:")
     for match in matches:
-        print(f"Pattern '{match['name']}' ({match['severity']} severity)")
-        for m in match['matches']:
-            print(f"  Found: {m['text']} at position {m['start']}")
-            
-    # Filter out sensitive information
-    filtered_text, _ = manager.filter_text(
-        text, 
-        min_severity="medium", 
-        replacement="[REDACTED]"
-    )
-    print(f"Filtered text: {filtered_text}")
-
-# Save patterns for future use
-manager.save_all_categories()
+        print(f"Pattern '{match['pattern']}' ({match['severity']} severity)")
+        print(f"  Found: {match['text']} at position {match['start']}")
+        
+    # Basic redaction example
+    redacted_text = text
+    for match in sorted(matches, key=lambda m: m['start'], reverse=True):
+        redacted_text = redacted_text[:match['start']] + "[REDACTED]" + redacted_text[match['end']:]
+    
+    print(f"Redacted text: {redacted_text}")
 ```
 
 ### Integrated Security Manager
@@ -480,21 +540,20 @@ Use the comprehensive security manager to integrate all security features:
 
 ```python
 from resk_llm.prompt_security import ReskSecurityManager
-from sentence_transformers import SentenceTransformer
+from resk_llm.embedding_utils import create_embedder
 
-# Initialize embedding model (ensure sentence-transformers is installed)
-# pip install sentence-transformers
-model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+# Initialize embedding model using Gensim (no torch required)
+embedder = create_embedder(embedder_type="gensim", model_type="word2vec")
 
 # Create embedding function
 def get_embedding(text):
-    return model.encode(text)
+    return embedder.embed(text)
 
 # Initialize the security manager
 # Using a directory for the vector DB is recommended
 security_manager = ReskSecurityManager(
     embedding_function=get_embedding,
-    embedding_dim=model.get_sentence_embedding_dimension(),
+    embedding_dim=300,  # Standard dimension for word2vec
     similarity_threshold=0.85,
     use_canary_tokens=True,
     enable_heuristic_filter=True,
@@ -675,55 +734,3 @@ messages = [
 
 managed_messages = context_manager.manage_sliding_context(messages)
 ```
-
-## Academic Research
-
-RESK-LLM is built on the latest security research in the field of LLM security:
-
-1. Wei, J., et al. (2023). "Jailbroken: How Does LLM Behavior Change When Conditioned on Adversarial Prompts?" arXiv preprint arXiv:2307.02483. [Link](https://arxiv.org/abs/2307.02483)
-
-2. Greshake, K., et al. (2023). "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection." arXiv preprint arXiv:2302.12173. [Link](https://arxiv.org/abs/2302.12173)
-
-3. Perez, F., & Brown, T. (2022). "Ignore Previous Prompt: Attack Techniques For Language Models." arXiv preprint arXiv:2211.09527. [Link](https://arxiv.org/abs/2211.09527)
-
-4. Shayegani, A., et al. (2023). "Prompt Injection Attacks and Defenses in LLM-Integrated Applications." arXiv preprint arXiv:2310.12815. [Link](https://arxiv.org/abs/2310.12815)
-
-5. Huang, J., et al. (2023). "Universal and Transferable Adversarial Attacks on Aligned Language Models." arXiv preprint arXiv:2307.15043. [Link](https://arxiv.org/abs/2307.15043)
-
-6. Liu, Y., et al. (2023). "Defending Large Language Models Against Jailbreaking Attacks Through Goal Prioritization." arXiv preprint arXiv:2311.09096. [Link](https://arxiv.org/abs/2311.09096)
-
-7. Phute, N., & Joshi, A. (2023). "A Survey of Safety and Security Concerns of Large Language Models." arXiv preprint arXiv:2308.09843. [Link](https://arxiv.org/abs/2308.09843)
-
-8. Zhan, X., et al. (2023). "Removing Harmful Content from Large Language Models." arXiv preprint arXiv:2402.04343. [Link](https://arxiv.org/abs/2402.04343)
-
-## Sources and Research Papers
-
-The development of RESK-LLM is inspired by and builds upon foundational research in LLM security. Here are some key resources:
-
-- **Prompt Injection:**
-    - Perez, F., & Ribeiro, I. (2022). *Ignore Previous Prompt: Attack Techniques For Language Models*. [arXiv:2211.09527](https://arxiv.org/abs/2211.09527)
-    - Greshake, K., Abdelnabi, S., Mishra, S., Endres, C., Holz, T., & Fritz, M. (2023). *More than you've asked for: A Comprehensive Analysis of Prompt Injection Threats against PaLM 2*. [arXiv:2307.09472](https://arxiv.org/abs/2307.09472)
-    - Liu, Y., et al. (2023). *Prompt Injection Attacks Against LLM-Integrated Applications*. [arXiv:2306.05499](https://arxiv.org/abs/2306.05499)
-- **Canary Tokens / Honeywords:**
-    - Juels, A., & Ristenpart, T. (2013). *Honeywords: Making Password-Cracking Detectable*. Proceedings of the 20th ACM conference on Computer and communications security.
-    - Canary Tokens Project: [canarytokens.org](https://canarytokens.org/generate) (Practical implementation of honeytokens)
-- **Vector Database for Security:**
-    - Using vector databases for anomaly detection and similarity search is a common technique. While specific papers on LLM prompt similarity for attack detection are emerging, the principles are based on broader AI security research.
-    - Related concept: Siang, K. E. A., & Ali, F. H. M. (2019). *A review of intrusion detection system using vector space model*. J. Phys.: Conf. Ser. 1339 012087
-- **General LLM Security Overviews:**
-    - OWASP Top 10 for Large Language Model Applications: [https://owasp.org/www-project-top-10-for-large-language-model-applications/](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
-    - NIST Trustworthy and Responsible AI: [https://www.nist.gov/artificial-intelligence](https://www.nist.gov/artificial-intelligence)
-
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) for more details.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-For questions or support, please open an issue on GitHub or contact the development team.
-
