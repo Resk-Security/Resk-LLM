@@ -1,46 +1,40 @@
 # LLM Provider SDKs
-openai>=1.41.0
-anthropic>=0.22.0
-cohere>=4.46.0
+openai>=1.79.0  # was 1.41.0
+anthropic>=0.24.0  # was 0.22.0
+cohere>=4.46.0  # inchangé
 
 # ML/AI Frameworks
-transformers>=4.44.2
-# torch>=2.0.0  # Removed as we're providing alternatives without PyTorch
-numpy>=1.20.0
-# sentence-transformers>=2.2.2  # Removed in favor of lightweight alternatives
-scikit-learn>=1.2.0  # For lightweight embeddings
-gensim>=4.3.0  # For word vectors without PyTorch
+transformers>=4.44.2  # inchangé
+numpy>=2.2.0  # was 1.20.0
+scikit-learn>=1.6.1  # was 1.2.0
+gensim>=4.3.0  # inchangé
 
 # Web Frameworks
-flask>=2.0.0
-fastapi>=0.110.0
-uvicorn>=0.28.0
-starlette>=0.36.0
-  
+flask>=3.1.0  # was 2.0.0
+fastapi>=0.110.0  # inchangé
+uvicorn>=0.28.0  # inchangé
+starlette>=0.36.0  # inchangé
+
 # Testing Tools
-pytest>=7.4.3
-pytest-asyncio>=0.23.5
-pytest-cov>=4.0.0
+pytest>=8.1.1  # was 7.4.3
+pytest-asyncio>=0.23.5  # inchangé
+pytest-cov>=4.0.0  # inchangé
 
 # LangChain Dependencies
-langchain>=0.1.0
-langchain-core>=0.1.0
-langchain-community>=0.1.0
-langchain-openai>=0.1.0
-# langgraph>=0.3.8  # Removed as it's causing installation issues
+langchain>=0.3.0  # was 0.1.0
+langchain-core>=0.3.0  # was 0.1.0
+langchain-community>=0.3.0  # was 0.1.0
+langchain-openai>=0.3.0  # was 0.1.0
 
 # Utility Libraries
-pydantic>=2.0.0
-requests>=2.25.0
-rich>=10.0.0
-typing-extensions>=4.0.0
-urllib3>=1.26.0
-httpx>=0.27.0
-pillow>=9.0.0
+pydantic>=2.6.0  # was 2.0.0
+requests>=2.31.0  # was 2.25.0
+rich>=13.7.0  # was 10.0.0
+typing-extensions>=4.10.0  # was 4.0.0
+urllib3>=2.2.0  # was 1.26.0
+httpx>=0.27.0  # inchangé
+pillow>=10.3.0  # was 9.0.0
 
 # Optional Dependencies for Advanced Features
-# uncomment as needed
-# tiktoken>=0.5.0  # For token counting with OpenAI models
-# faiss-cpu>=1.7.4  # For vector search without GPU
-
-# CPU-only PyTorch alternative: Use scikit-learn and gensim for embedding (already listed above)
+# tiktoken>=0.5.0  # Pour le comptage de tokens avec les modèles OpenAI
+# faiss-cpu>=1.7.4  # Pour la recherche vectorielle sans GPU

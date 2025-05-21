@@ -1,4 +1,4 @@
-name: Python Package CI/CD
+name: Python Package CI/CD with UV
 
 on:
   push:
@@ -25,25 +25,29 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        # Install dependencies from requirements.txt first
-        pip install -r requirements.txt 
-        # Install the package itself in editable mode
-        pip install -e .
-        # Install testing tools explicitly
-        pip install pytest flake8 mypy pytest-asyncio # Added pytest-asyncio too, as it's used
+        # Install all dependencies including dev dependencies
+        uv pip install -e ".[dev]"
+    
     - name: Lint with flake8
       run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        uv run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        uv run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
     - name: Type check with mypy
       run: |
-        mypy --ignore-missing-imports resk_llm/
+        uv run mypy --ignore-missing-imports resk_llm/
+    
     - name: Test with pytest
       run: |
-        pytest -v
+        uv run pytest -v
 
   build-and-publish:
     needs: test
@@ -59,28 +63,33 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
     - name: Install build and upload dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install build twine # Re-added twine
-    # - name: Run pre-release check # Keep commented unless needed
-    #   run: |
-    #     python pre_release_check.py
+        uv pip install build twine
+    
     - name: Build package
       run: |
-        python -m build
+        uv run python -m build
+    
     - name: Verify package distribution
       run: |
-        twine check dist/* # Re-added twine check
+        uv run twine check dist/*
+    
     - name: Publish package to PyPI
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }} # Use the secret token
       run: |
-        twine upload dist/* --skip-existing # Re-added twine upload
-
+        uv run twine upload dist/* --skip-existing
+    
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         files: dist/*
-        generate_release_notes: true
+        generate_release_notes: true 

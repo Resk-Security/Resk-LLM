@@ -176,12 +176,14 @@ class SklearnEmbedder:
             self._initialize_models()
             
         # Fit vectorizer
-        tfidf_matrix = self.vectorizer.fit_transform(texts)
-        
-        # Fit dimensionality reducer
-        self.dim_reducer.fit(tfidf_matrix)
-        
-        self.is_trained = True
+        if self.vectorizer is not None:
+            tfidf_matrix = self.vectorizer.fit_transform(texts)
+            
+            # Fit dimensionality reducer
+            if self.dim_reducer is not None:
+                self.dim_reducer.fit(tfidf_matrix)
+                
+            self.is_trained = True
     
     def embed(self, text: str) -> np.ndarray:
         """
@@ -197,12 +199,16 @@ class SklearnEmbedder:
             raise ValueError("Models not trained. Call train() first with a corpus of texts.")
             
         # Transform text to TF-IDF
-        tfidf_vector = self.vectorizer.transform([text])
-        
-        # Reduce dimensionality
-        embedding = self.dim_reducer.transform(tfidf_vector)
-        
-        return embedding[0]
+        if self.vectorizer is not None:
+            tfidf_vector = self.vectorizer.transform([text])
+            
+            # Reduce dimensionality
+            if self.dim_reducer is not None:
+                embedding = self.dim_reducer.transform(tfidf_vector)
+                return embedding[0]
+                
+        # If we get here, something went wrong
+        return np.zeros(self.dimension)
 
 
 class SimpleEmbedder:
@@ -223,7 +229,7 @@ class SimpleEmbedder:
         self.dimension = dimension
         self.seed = seed
         self.rng = np.random.RandomState(seed)
-        self.word_vectors = {}  # Cache for word vectors
+        self.word_vectors: Dict[str, np.ndarray] = {}  # Cache for word vectors
         logger.info(f"SimpleEmbedder initialized with dimension {dimension}")
     
     def _hash_word(self, word: str) -> np.ndarray:
