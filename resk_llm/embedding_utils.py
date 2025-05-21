@@ -66,6 +66,9 @@ class GensimEmbedder:
             logger.error("Gensim is not installed. Install it with 'pip install gensim'")
             raise
         except Exception as e:
+            if 'scipy' in str(e) and 'triu' in str(e):
+                logger.error(f"Missing scipy.linalg.triu dependency: {e}. Install scipy with 'pip install scipy>=1.8.0'")
+                raise ImportError(f"Missing scipy dependency: {e}")
             logger.error(f"Error loading model: {str(e)}")
             raise
     
@@ -143,7 +146,6 @@ class SklearnEmbedder:
         """Initialize the vectorizer and dimensionality reduction models."""
         try:
             from sklearn.feature_extraction.text import TfidfVectorizer
-            from sklearn.decomposition import PCA, TruncatedSVD
             
             # Initialize vectorizer
             self.vectorizer = TfidfVectorizer(
@@ -152,17 +154,24 @@ class SklearnEmbedder:
                 ngram_range=(1, 2)  # Use both unigrams and bigrams
             )
             
-            # Initialize dimensionality reduction model
-            if self.use_pca:
-                self.dim_reducer = PCA(n_components=self.dimension)
-            else:
-                self.dim_reducer = TruncatedSVD(n_components=self.dimension)
+            # Try to initialize dimensionality reduction
+            try:
+                from sklearn.decomposition import PCA, TruncatedSVD
+                
+                # Initialize dimensionality reduction model
+                if self.use_pca:
+                    self.dim_reducer = PCA(n_components=self.dimension)
+                else:
+                    self.dim_reducer = TruncatedSVD(n_components=self.dimension)
+            except ImportError as e:
+                logger.warning(f"Error importing dimensionality reduction: {e}")
+                self.dim_reducer = None
                 
             # Flag to check if models are trained
             self.is_trained = False
             
-        except ImportError:
-            logger.error("scikit-learn is not installed. Install it with 'pip install scikit-learn'")
+        except ImportError as e:
+            logger.error(f"scikit-learn is not installed: {e}")
             raise
     
     def train(self, texts: List[str]) -> None:
@@ -219,12 +228,13 @@ class SimpleEmbedder:
     Not recommended for production use.
     """
     
-    def __init__(self, dimension: int = 100, seed: int = 42):
+    def __init__(self, dimension: int = 100, seed: int = 42, **kwargs):
         """Initialize the simple embedder.
         
         Args:
             dimension: Dimension of embedding vectors
             seed: Random seed for reproducibility
+            **kwargs: Additional arguments that are ignored (for compatibility with other embedders)
         """
         self.dimension = dimension
         self.seed = seed
