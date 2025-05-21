@@ -11,7 +11,7 @@ authors = [
 description = "Resk-LLM is a robust Python library designed to enhance security and manage context when interacting with LLM APIs. It provides a protective layer for API calls, safeguarding against common vulnerabilities and ensuring optimal performance."
 readme = "README.md"
 license = {file = "LICENSE.txt"}
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
