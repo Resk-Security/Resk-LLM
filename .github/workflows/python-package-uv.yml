@@ -35,8 +35,8 @@ jobs:
       run: |
         # Create a virtual environment first
         uv venv
-        # Install all dependencies including dev dependencies
-        uv pip install -e ".[dev]"
+        # Install all dependencies including dev and embeddings dependencies
+        uv pip install -e ".[dev,embeddings]"
     
     - name: Lint with flake8
       run: |
@@ -49,7 +49,7 @@ jobs:
     
     - name: Test with pytest
       run: |
-        uv run python -m pytest -v
+        uv run python -m pytest -v --no-header --disable-warnings
 
   build-and-publish:
     needs: test
