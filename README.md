@@ -1,6 +1,6 @@
 # RESK-LLM: Robust Security for LLM Applications
 
-> **⚠️ Important Notice:** Le module `competitor_filter` mentionné dans certains exemples a été renommé en `content_policy_filter`. Si vous rencontrez une erreur `ModuleNotFoundError: No module named 'resk_llm.competitor_filter'`, utilisez `from resk_llm.content_policy_filter import ContentPolicyFilter` à la place. Consultez les exemples mis à jour ci-dessous.
+> ⚠️ Important Notice: The competitor_filter module mentioned in some examples has been renamed to content_policy_filter. If you encounter a ModuleNotFoundError: No module named 'resk_llm.competitor_filter' error, use from resk_llm.content_policy_filter import ContentPolicyFilter instead. See the updated examples below.
 
 RESK-LLM est une bibliothèque Python robuste conçue pour améliorer la sécurité et gérer le contexte lors des interactions avec les API LLM. Elle fournit une couche de protection pour les appels API, protégeant contre les vulnérabilités courantes et assurant des performances optimales.
 
