@@ -8,6 +8,7 @@ This module offers text embedding capabilities using alternatives like:
 
 import logging
 import numpy as np
+import hashlib
 from typing import List, Dict, Any, Optional, Union, Callable
 
 # Logger configuration
@@ -204,20 +205,118 @@ class SklearnEmbedder:
         return embedding[0]
 
 
-def create_embedder(embedder_type: str = "gensim", **kwargs) -> Union[GensimEmbedder, SklearnEmbedder]:
+class SimpleEmbedder:
     """
-    Factory function to create an appropriate embedder.
+    A very lightweight embedder that doesn't require any external models.
+    Creates embeddings based on simple word hashing techniques.
+    This is mainly for testing or environments where downloading models is not feasible.
+    Not recommended for production use.
+    """
+    
+    def __init__(self, dimension: int = 100, seed: int = 42):
+        """Initialize the simple embedder.
+        
+        Args:
+            dimension: Dimension of embedding vectors
+            seed: Random seed for reproducibility
+        """
+        self.dimension = dimension
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+        self.word_vectors = {}  # Cache for word vectors
+        logger.info(f"SimpleEmbedder initialized with dimension {dimension}")
+    
+    def _hash_word(self, word: str) -> np.ndarray:
+        """Create a deterministic vector for a word using its hash."""
+        # Use hash of the word as a seed
+        word_hash = int(hashlib.md5(word.encode()).hexdigest(), 16) % (2**32)
+        word_rng = np.random.RandomState(word_hash + self.seed)
+        # Generate a random vector but deterministic for the same word
+        return word_rng.randn(self.dimension)
+    
+    def embed(self, text: str) -> np.ndarray:
+        """Create embedding for the given text.
+        
+        Args:
+            text: Input text to embed
+            
+        Returns:
+            Numpy array of embedding with shape (dimension,)
+        """
+        if not text or not isinstance(text, str):
+            # Return zero vector for empty input
+            return np.zeros(self.dimension)
+        
+        # Simple preprocessing
+        words = text.lower().split()
+        
+        if not words:
+            return np.zeros(self.dimension)
+        
+        # Get or compute vectors for each word
+        word_vectors = []
+        for word in words:
+            if word not in self.word_vectors:
+                self.word_vectors[word] = self._hash_word(word)
+            word_vectors.append(self.word_vectors[word])
+        
+        # Average the word vectors
+        embedding = np.mean(word_vectors, axis=0)
+        
+        # Normalize to unit length
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+            
+        return embedding
+    
+    def train(self, corpus: List[str]) -> None:
+        """Pretend to train on a corpus (for API compatibility with other embedders).
+        
+        For SimpleEmbedder, this just pre-computes vectors for words in the corpus.
+        
+        Args:
+            corpus: List of text documents
+        """
+        # Pre-compute word vectors for all words in the corpus
+        all_words = set()
+        for doc in corpus:
+            all_words.update(doc.lower().split())
+        
+        for word in all_words:
+            if word not in self.word_vectors:
+                self.word_vectors[word] = self._hash_word(word)
+        
+        logger.info(f"SimpleEmbedder pre-computed vectors for {len(all_words)} words")
+
+
+def create_embedder(embedder_type: str = "simple", **kwargs) -> Any:
+    """Create an embedder based on the specified type.
     
     Args:
-        embedder_type: Type of embedder to create ("gensim" or "sklearn")
+        embedder_type: Type of embedder to create ('gensim', 'sklearn', or 'simple')
         **kwargs: Additional arguments to pass to the embedder constructor
-        
+    
     Returns:
         An embedder instance
+    
+    Raises:
+        ValueError: If an unsupported embedder_type is specified
     """
-    if embedder_type.lower() == "gensim":
-        return GensimEmbedder(**kwargs)
-    elif embedder_type.lower() == "sklearn":
-        return SklearnEmbedder(**kwargs)
+    if embedder_type == "gensim":
+        try:
+            return GensimEmbedder(**kwargs)
+        except ImportError:
+            logger.warning("Gensim is not installed, falling back to SimpleEmbedder")
+            return SimpleEmbedder(**kwargs)
+    elif embedder_type == "sklearn":
+        try:
+            return SklearnEmbedder(**kwargs)
+        except ImportError:
+            logger.warning("scikit-learn is not installed, falling back to SimpleEmbedder")
+            return SimpleEmbedder(**kwargs)
+    elif embedder_type == "simple":
+        return SimpleEmbedder(**kwargs)
     else:
-        raise ValueError(f"Unsupported embedder type: {embedder_type}") 
+        raise ValueError(f"Unsupported embedder type: {embedder_type}. "
+                         f"Supported types are: 'gensim', 'sklearn', 'simple'") 
