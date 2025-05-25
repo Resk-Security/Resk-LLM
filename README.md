@@ -63,11 +63,11 @@ pip install resk-llm[vector,embeddings]
 # For all features (may install torch depending on your platform)
 pip install resk-llm[all]
 ```
+RESK-LLM now offers lightweight alternatives to PyTorch-based dependencies:
 
-RESK-LLM offre désormais des alternatives légères aux dépendances basées sur PyTorch :
-- Utilisation de Gensim pour les embeddings au lieu de sentence-transformers
-- Support de scikit-learn pour des alternatives vectorielles légères
-- Fonctionnalités complètes avec ou sans torch
+- Uses Gensim for embeddings instead of sentence-transformers
+- Supports scikit-learn for lightweight vector-based alternatives
+- Fully functional with or without Torch
 
 ## Quick Start
 
