@@ -42,7 +42,7 @@ dependencies = [
     "pytest-asyncio>=0.23.5",
     "tldextract>=3.4.4",
     "mypy",
-    "jwt",
+    "PyJWT",
 ]
 
 [project.urls]

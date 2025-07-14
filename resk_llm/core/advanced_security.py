@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 import re
 import base64
 import jwt  # PyJWT
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from jwt import ExpiredSignatureError, InvalidTokenError
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC

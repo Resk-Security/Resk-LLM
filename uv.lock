@@ -836,7 +836,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -1107,36 +1107,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f2/77/deb99b97981e2e191913454da82d406702405178631c31cd623caebaf1b1/fsspec-2025.5.0.tar.gz", hash = "sha256:e4f4623bb6221f7407fd695cc535d1f857a077eb247580f4ada34f5dc25fd5c8", size = 300989, upload-time = "2025-05-20T15:46:22.484Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/a9/a7022f58e081149ec0184c31ea81dcee605e1d46380b48122e1ef94ac24e/fsspec-2025.5.0-py3-none-any.whl", hash = "sha256:0ca253eca6b5333d8a2b8bd98c7326fe821f1f0fdbd34e1b445bddde8e804c95", size = 196164, upload-time = "2025-05-20T15:46:20.89Z" },
-]
-
-[[package]]
-name = "gensim"
-version = "4.3.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "smart-open" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/77/68/074333a52f6fa82402332054ca0dfa721f7dcfa7eace313f64cdb44bacde/gensim-4.3.2.tar.gz", hash = "sha256:99ac6af6ffd40682e70155ed9f92ecbf4384d59fb50af120d343ea5ee1b308ab", size = 23263982, upload-time = "2023-08-24T08:51:27.492Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/43/21/21f993356303c4c92352d9e7c732f715e86e7b0bc04674be71bb1e9bb05b/gensim-4.3.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:31b3cb313939b6940ee21660177f6405e71b920da462dbf065b2458a24ab33e1", size = 24084903, upload-time = "2023-08-24T08:48:21.2Z" },
-    { url = "https://files.pythonhosted.org/packages/d7/84/ec2f74713475b57b7d882f5160b0b7c9df40ecc409d793e87656a6f3ada0/gensim-4.3.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:67c41b15e19e4950f57124f633c45839b5c84268ffa58079c5b0c0f04d2a9cb9", size = 24035874, upload-time = "2023-08-24T08:48:29.699Z" },
-    { url = "https://files.pythonhosted.org/packages/59/84/ed371ab548a02e16f83669dee5337ad3917d3bf980878608956817e0534b/gensim-4.3.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a9bf1a8ee2e8214499c517008a0fd175ce5c649954a88569358cfae6bfca42dc", size = 26398052, upload-time = "2023-08-24T08:48:38.961Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/d9/104988573fd2c1acdc64e66883b35fb8ae559310d2d9f77db78bf7de9add/gensim-4.3.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5e34ee6f8a318fbf0b65e6d39a985ecf9e9051febfd1221ae6255fff1972c547", size = 26506991, upload-time = "2023-08-24T08:48:48.227Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/b0/d58dc405fd60ab546ca714321235dc2d455b2dc06bfb4fc1092940c749fc/gensim-4.3.2-cp310-cp310-win_amd64.whl", hash = "sha256:c46b7395dc57c83329932f3febed9660891fdcc75327d56f55000e3e08898983", size = 24012956, upload-time = "2023-08-24T08:48:55.178Z" },
-    { url = "https://files.pythonhosted.org/packages/99/f5/8d2cb0b2628bb6482baafbf0ff7262c11fc46e98b23ee79234828b927e8d/gensim-4.3.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:a919493339cfad39d5e76768c1bc546cd507f715c5fca93165cc174a97657457", size = 24078719, upload-time = "2023-08-24T08:49:02.56Z" },
-    { url = "https://files.pythonhosted.org/packages/63/46/5feab9c524a380bfa9f9f1c0d065743280dca30b216ab4c7a231f22dbed7/gensim-4.3.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:8dcd1419266bd563c371d25530f4dce3505fe78059b2c0c08724e4f9e5479b38", size = 24030236, upload-time = "2023-08-24T08:49:11.574Z" },
-    { url = "https://files.pythonhosted.org/packages/14/34/f1e056feda95330f7d8beef6771e3441ce0e8e2d1f55bf754b0b0594b234/gensim-4.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e3e8035ac3f54dca3a8ca56bec526ddfe5b23006e0134b7375ca5f5dbfaef70a", size = 26558413, upload-time = "2023-08-24T08:49:21.748Z" },
-    { url = "https://files.pythonhosted.org/packages/22/40/7d2cce3ad4ad5d02aa68e253e6ea5f0acc381f02f594e235fe00a274faff/gensim-4.3.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8c3b537c1fd4699c8e6d59c3ffa2fdd9918cd4e5555bf5ee7c1fbedd89b2d643", size = 26662667, upload-time = "2023-08-24T08:49:30.448Z" },
-    { url = "https://files.pythonhosted.org/packages/ad/97/b8253236dfedb9094f4273393a3fd03997da81f27f15822e56128da894ae/gensim-4.3.2-cp311-cp311-win_amd64.whl", hash = "sha256:5a52001226f9e89f7833503f99c9b4fd028fdf837002f24cdc1bc3cf901a4003", size = 24010152, upload-time = "2023-08-24T08:49:45.111Z" },
-    { url = "https://files.pythonhosted.org/packages/04/59/0a073bcf0873f64f3c6e82a11c8fa90cd5564cb3e21dc6077bc7b3feb644/gensim-4.3.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:c86915cf0e0b86658a40a070bd7e04db0814065963657e92910303070275865d", size = 24088600, upload-time = "2023-08-24T08:50:43.951Z" },
-    { url = "https://files.pythonhosted.org/packages/db/af/18b551ae8d26b8731dbe5923565fdf96502bb9aca88a37f241d510c62dc2/gensim-4.3.2-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:548c7bf983e619d6b8d78b6a5321dcbcba5b39f68779a0d36e38a5a971416276", size = 24038105, upload-time = "2023-08-24T08:50:52.406Z" },
-    { url = "https://files.pythonhosted.org/packages/34/a9/34fa729b0700361d35a3640b95395ead6c101ec290c0fe6c53d473c03ccc/gensim-4.3.2-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:226690ea081b92a2289661a25e8a89069ae09b1ed4137b67a0d6ec211e0371d3", size = 26453791, upload-time = "2023-08-24T08:51:02.911Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/ef/d559c7daebb2f00b881575551b23866ebcbf6eeaf33393d692c7f46d0983/gensim-4.3.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4715eafcd309c2f7e030829eddba72fe47bbe9bb466811fce3158127d29c8979", size = 26552639, upload-time = "2023-08-24T08:51:11.634Z" },
-    { url = "https://files.pythonhosted.org/packages/d3/68/373da90a8b241e2603707c7aa4c8f47829a72729c6e9497f2bc604fa6a6a/gensim-4.3.2-cp39-cp39-win_amd64.whl", hash = "sha256:b3f26299ac241ff54329a54c37c22eac1bf4c4a337068adf2637259ee0d8484a", size = 24021169, upload-time = "2023-08-24T08:51:18.831Z" },
 ]
 
 [[package]]
@@ -3503,6 +3473,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyjwt"
+version = "2.10.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/46/bd74733ff231675599650d3e47f361794b22ef3e3770998dda30d3b63726/pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953", size = 87785, upload-time = "2024-11-28T03:43:29.933Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb", size = 22997, upload-time = "2024-11-28T03:43:27.893Z" },
+]
+
+[[package]]
 name = "pymilvus"
 version = "2.5.9"
 source = { registry = "https://pypi.org/simple" }
@@ -3873,7 +3852,7 @@ wheels = [
 
 [[package]]
 name = "resk-llm"
-version = "1.0.7"
+version = "1.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -3891,6 +3870,7 @@ dependencies = [
     { name = "openai" },
     { name = "pillow" },
     { name = "pydantic" },
+    { name = "pyjwt" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "requests" },
@@ -3907,7 +3887,6 @@ dependencies = [
 all = [
     { name = "chromadb" },
     { name = "faiss-cpu" },
-    { name = "gensim" },
     { name = "ipaddress" },
     { name = "pinecone-client" },
     { name = "pymilvus" },
@@ -3928,10 +3907,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "twine" },
 ]
-embeddings = [
-    { name = "gensim" },
-    { name = "scikit-learn" },
-]
 text-analysis = [
     { name = "unicodedata2" },
 ]
@@ -3941,7 +3916,6 @@ url-security = [
 ]
 vector = [
     { name = "faiss-cpu" },
-    { name = "gensim" },
     { name = "scikit-learn" },
 ]
 vector-all = [
@@ -3966,9 +3940,6 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.110.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "flask", specifier = ">=2.0.0" },
-    { name = "gensim", marker = "extra == 'all'", specifier = ">=4.3.0" },
-    { name = "gensim", marker = "extra == 'embeddings'", specifier = ">=4.3.0" },
-    { name = "gensim", marker = "extra == 'vector'", specifier = ">=4.3.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "ipaddress", marker = "extra == 'all'", specifier = ">=1.0.23" },
     { name = "ipaddress", marker = "extra == 'url-security'", specifier = ">=1.0.23" },
@@ -3984,6 +3955,7 @@ requires-dist = [
     { name = "pinecone-client", marker = "extra == 'all'", specifier = ">=2.2.1" },
     { name = "pinecone-client", marker = "extra == 'vector-all'", specifier = ">=2.2.1" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pyjwt" },
     { name = "pymilvus", marker = "extra == 'all'", specifier = ">=2.3.0" },
     { name = "pymilvus", marker = "extra == 'vector-all'", specifier = ">=2.3.0" },
     { name = "pytest", specifier = ">=7.4.3" },
@@ -3995,7 +3967,6 @@ requires-dist = [
     { name = "requests", specifier = ">=2.25.0" },
     { name = "rich", specifier = ">=10.0.0" },
     { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.2.0" },
-    { name = "scikit-learn", marker = "extra == 'embeddings'", specifier = ">=1.2.0" },
     { name = "scikit-learn", marker = "extra == 'vector'", specifier = ">=1.2.0" },
     { name = "spacy", marker = "extra == 'competitor-filter'", specifier = ">=3.5.0" },
     { name = "starlette", specifier = ">=0.36.0" },
@@ -4012,7 +3983,7 @@ requires-dist = [
     { name = "weaviate-client", marker = "extra == 'all'", specifier = ">=3.25.0" },
     { name = "weaviate-client", marker = "extra == 'vector-all'", specifier = ">=3.25.0" },
 ]
-provides-extras = ["dev", "embeddings", "all", "vector", "vector-all", "url-security", "text-analysis", "competitor-filter"]
+provides-extras = ["dev", "all", "vector", "vector-all", "url-security", "text-analysis", "competitor-filter"]
 
 [[package]]
 name = "rfc3986"
