@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0] - 2025-13-07
+## [1.2.1] - 2025-13-07
 
 ### Added
 - New example: `examples/fastapi_resk_example.py` demonstrating integration of cache, monitoring, and advanced security with FastAPI.
