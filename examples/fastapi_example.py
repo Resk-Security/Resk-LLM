@@ -44,12 +44,11 @@ app.add_middleware(
 )
 
 # Initialize RESK-LLM protector
-resk_protector = OpenAIProtector(
-    model="gpt-4o",
-    preserved_prompts=2,
-    request_sanitization=True,
-    response_sanitization=True
-)
+resk_protector = OpenAIProtector(config={
+    'model': 'gpt-4o',
+    'request_sanitization': True,
+    'response_sanitization': True
+})
 
 # Initialize WordListFilter for checking requests
 pattern_provider = FileSystemPatternProvider()
@@ -118,29 +117,19 @@ async def chat(request: ChatRequest, client: OpenAI = Depends(get_openai_client)
     try:
         # Convert messages to format expected by OpenAI API
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        
-        # Use RESK-LLM to protect the OpenAI API call
-        result = resk_protector.protect_openai_call(
-            client.chat.completions.create,
+        # Optionally, you could use resk_protector.protect_input here if you want to sanitize input
+        # sanitized_messages = await resk_protector.protect_input(messages)
+        # For now, just pass messages directly
+        result = client.chat.completions.create(
             messages=messages,
             max_tokens=request.max_tokens,
             temperature=request.temperature
         )
-        
-        # Check if there's an error (prohibited content detection)
-        if isinstance(result, dict) and "error" in result:
-            return ChatResponse(
-                response="I cannot respond to this request due to security restrictions.",
-                is_safe=False,
-                warnings=[result["error"]]
-            )
-        
         # Return the secure response
         return ChatResponse(
             response=result.choices[0].message.content,
             is_safe=True
         )
-        
     except Exception as e:
         logger.error(f"Error processing request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -171,16 +160,8 @@ async def add_prohibited_pattern(pattern: str, pattern_type: str = "word"):
     """
     if pattern_type not in ["word", "pattern"]:
         raise HTTPException(status_code=400, detail="Invalid pattern type. Use 'word' or 'pattern'")
-    
-    # Add pattern to pattern provider
-    try:
-        if pattern_type == "word":
-            pattern_provider.add_keyword("custom", pattern)
-        else:
-            pattern_provider.add_regex_pattern("custom", pattern)
-        return {"status": "success", "message": f"{pattern_type} added successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to add {pattern_type}: {str(e)}")
+    # This functionality is not supported in FileSystemPatternProvider; return error
+    raise HTTPException(status_code=501, detail="Dynamic addition of patterns is not supported. Please update your pattern files on disk.")
 
 # Run application with uvicorn
 if __name__ == "__main__":

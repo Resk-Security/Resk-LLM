@@ -7,7 +7,7 @@ against prompt injection, jailbreaking, and other security threats.
 import os
 import sys
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from resk_llm import create_huggingface_protector
+from resk_llm.huggingface_integration import create_huggingface_protector
 from typing import List, Dict, Any
 
 def main():

@@ -8,9 +8,9 @@ with open("LICENSE.txt", "r", encoding="utf-8") as f:
 
 setup(
     name="resk-llm",
-    version="1.0.7",
+    version="1.2.0",
     author="Resk",
-    author_email="nielzac@proton.me",
+    author_email="contact@resk.fr",
     description="Resk-LLM is a robust Python library designed to enhance security and manage context when interacting with LLM APIs. It provides a protective layer for API calls, safeguarding against common vulnerabilities and ensuring optimal performance.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -48,11 +48,11 @@ setup(
         "pytest-asyncio>=0.23.5",
         "tldextract>=3.4.4",  # For URL domain extraction
         "mypy",
+        "PyJWT>=2.0.0",  # Pour la gestion des tokens JWT
     ],
     extras_require={
         "embeddings": [
             "scikit-learn>=1.2.0",  # Provides alternatives for embeddings
-            "gensim>=4.3.0",  # Alternative for embeddings without torch
         ],
         "all": [
             "tiktoken>=0.5.0",
@@ -65,12 +65,10 @@ setup(
             "chromadb>=0.4.22",  # For ChromaDB vector database
             "tldextract>=3.4.4",  # For URL domain extraction
             "ipaddress>=1.0.23",  # For IP address handling
-            "gensim>=4.3.0",  # Alternative for embeddings without torch
         ],
         "vector": [
             "faiss-cpu>=1.7.4",  # For CPU-based vector search
             "scikit-learn>=1.2.0",  # For creating embeddings without torch
-            "gensim>=4.3.0",  # Alternative for embeddings without torch
         ],
         "vector-all": [
             "faiss-cpu>=1.7.4",

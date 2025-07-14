@@ -8,7 +8,7 @@ import os
 from langchain.prompts import ChatPromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
-from resk_llm import create_langchain_protector
+from resk_llm.langchain_integration import create_langchain_protector
 
 # Set API key for OpenAI
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")

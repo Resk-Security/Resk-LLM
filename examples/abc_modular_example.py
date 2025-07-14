@@ -113,19 +113,29 @@ class CustomPIIDetector(DetectorBase[str, Dict[str, Any]]):
         Returns:
             Dict with detection results
         """
-        results = {
+        results: Dict[str, Any] = {
             'has_pii': False,
             'detected_pii': {},
             'pii_count': 0
         }
-        
+        # Ensure detected_pii is always a dict
+        if not isinstance(results['detected_pii'], dict):
+            results['detected_pii'] = {}
+        if not isinstance(results['pii_count'], int):
+            results['pii_count'] = 0
         for name, pattern in self.compiled_patterns.items():
             matches = pattern.findall(data)
             if matches:
                 results['has_pii'] = True
-                results['detected_pii'][name] = matches
-                results['pii_count'] += len(matches)
-        
+                detected_pii = results['detected_pii']
+                if not isinstance(detected_pii, dict):
+                    detected_pii = {}
+                detected_pii[name] = matches
+                results['detected_pii'] = detected_pii
+                pii_count = results['pii_count']
+                if not isinstance(pii_count, int):
+                    pii_count = 0
+                results['pii_count'] = pii_count + len(matches)
         return results
 
 # Example of custom filter component that inherits from FilterBase

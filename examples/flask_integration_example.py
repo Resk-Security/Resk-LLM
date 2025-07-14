@@ -28,11 +28,9 @@ protector = FlaskProtector(
         "use_default_patterns": True,
         "log_blocked_requests": True,
         "debug_mode": True,
-        "similarity_threshold": 0.85,  # Threshold for vector similarity comparisons
+        "similarity_threshold": 0.85
     }
 )
-
-# Register the protector with the Flask app
 protector.init_app(app)
 
 @app.route('/api/chat', methods=['POST'])

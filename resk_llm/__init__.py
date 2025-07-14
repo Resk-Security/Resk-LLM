@@ -28,6 +28,19 @@ from .core.abc import (
     SecurityManagerBase
 )
 
+# --- Enhanced Core Components ---
+from .core.cache import IntelligentCache, ParallelProcessor, get_cache, cached_component_call
+from .core.monitoring import (
+    ReskMonitor, SecurityEvent, EventType, Severity, AlertRule,
+    get_monitor, log_security_event, performance_monitor
+)
+from .core.advanced_security import (
+    AdvancedCrypto, AnomalyDetector, AdaptiveSecurityManager,
+    ThreatIntelligence, ThreatLevel, AuthenticationMethod,
+    get_security_manager,
+    ActivityAnalysisResult,
+)
+
 # --- Factory Functions ---
 from .factory import (
     create_heuristic_filter,
@@ -89,7 +102,6 @@ from .autonomous_agent_security import (
 
 # --- Embedding Utilities (torch-free alternatives) ---
 from .embedding_utils import (
-    GensimEmbedder,
     SklearnEmbedder,
     create_embedder
 )
@@ -106,6 +118,28 @@ __all__ = [
     'ProtectorBase',
     'PatternProviderBase',
     'SecurityManagerBase',
+    
+    # Enhanced Core Components
+    'IntelligentCache',
+    'ParallelProcessor',
+    'get_cache',
+    'cached_component_call',
+    'ReskMonitor',
+    'SecurityEvent',
+    'EventType',
+    'Severity',
+    'AlertRule',
+    'get_monitor',
+    'log_security_event',
+    'performance_monitor',
+    'AdvancedCrypto',
+    'AnomalyDetector',
+    'AdaptiveSecurityManager',
+    'ThreatIntelligence',
+    'ThreatLevel',
+    'AuthenticationMethod',
+    'get_security_manager',
+    'ActivityAnalysisResult',
     
     # Factory Functions
     'create_heuristic_filter',
@@ -170,7 +204,6 @@ __all__ = [
     'AGENT_DEFAULT_PERMISSIONS',
     
     # Embedding Utilities (torch-free alternatives)
-    'GensimEmbedder',
     'SklearnEmbedder',
     'create_embedder',
 ]

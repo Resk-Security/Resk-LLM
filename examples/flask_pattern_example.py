@@ -35,29 +35,31 @@ def check_admin_auth():
     return api_key == ADMIN_API_KEY
 
 # Initialiser le fournisseur de patterns pour les patterns personnalisés
-pattern_provider = FileSystemPatternProvider(patterns_dir=PATTERNS_DIR)
+pattern_provider = FileSystemPatternProvider(config={"patterns_base_dir": PATTERNS_DIR})
 
 # Créer le filtre de liste de mots avec notre fournisseur de patterns
 word_list_filter = WordListFilter(config={"pattern_provider": pattern_provider})
 
 # Initialiser le protecteur Flask avec l'API de patterns activée
 flask_protector = FlaskProtector(
-    app=app,
-    model="gpt-4o",
-    rate_limit=60,
-    request_sanitization=True,
-    response_sanitization=True,
-    custom_patterns_dir=PATTERNS_DIR,
-    enable_patterns_api=True,
-    patterns_api_prefix="/api/patterns",
-    patterns_api_auth=check_admin_auth
+    config={
+        "app": app,
+        "model": "gpt-4o",
+        "rate_limit": 60,
+        "request_sanitization": True,
+        "response_sanitization": True,
+        "custom_patterns_dir": PATTERNS_DIR,
+        "enable_patterns_api": True,
+        "patterns_api_prefix": "/api/patterns",
+        "patterns_api_auth": check_admin_auth
+    }
 )
 
 # Initialiser le client OpenAI
 client = OpenAI(api_key=API_KEY)
 
 # Initialiser le protecteur OpenAI avec notre filtre
-openai_protector = OpenAIProtector(model="gpt-4o", filters=[word_list_filter])
+openai_protector = OpenAIProtector(config={"model": "gpt-4o", "filters": [word_list_filter]})
 
 # Page d'accueil simple
 @app.route('/')
@@ -311,7 +313,8 @@ def chat_endpoint():
             }), 400
         
         # Utiliser le protecteur pour appeler l'API OpenAI
-        response = openai_protector.protect_openai_call(
+        # Replace protect_openai_call with execute_protected
+        response = openai_protector.execute_protected(
             client.chat.completions.create,
             messages=data["messages"]
         )

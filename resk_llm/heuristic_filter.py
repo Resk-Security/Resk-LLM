@@ -4,6 +4,8 @@ from typing import List, Dict, Set, Tuple, Any, Optional, Union
 
 # Import the base class
 from resk_llm.core.abc import FilterBase
+from resk_llm.core.cache import cached_component_call, get_cache
+from resk_llm.core.monitoring import performance_monitor, log_security_event, EventType, Severity
 
 # Define a specific config type for clarity, though it's simple for now
 HeuristicFilterConfig = Dict[str, Union[List[str], Set[str]]]
@@ -190,6 +192,8 @@ class HeuristicFilter(FilterBase[str, FilterResult, HeuristicFilterConfig]):
             # Fail safe: if error occurs, block the input
             return True, f"Error during content analysis: {str(e)}"
 
+    @performance_monitor('HeuristicFilter')
+    @cached_component_call('HeuristicFilter')
     def filter(self, data: str) -> FilterResult:
         """
         Apply the heuristic filter to the input text.
@@ -205,4 +209,15 @@ class HeuristicFilter(FilterBase[str, FilterResult, HeuristicFilterConfig]):
         """
         is_suspicious, reason = self._check_input(data)
         passed_filter = not is_suspicious
+        
+        # Log security events
+        if is_suspicious:
+            log_security_event(
+                EventType.INJECTION_ATTEMPT,
+                'HeuristicFilter',
+                f'Suspicious content detected: {reason}',
+                Severity.HIGH,
+                details={'content_preview': data[:100]}
+            )
+        
         return passed_filter, reason, data # Return original text 

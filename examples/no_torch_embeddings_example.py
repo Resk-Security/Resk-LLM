@@ -80,20 +80,7 @@ if result["detected"]:
     print(f"Similar to: {result['similar_entries'][0]['metadata']['text']}")
 
 # Optional: Try with other embedders if available
-try:
-    print("\n=== Trying Gensim (Only if installed) ===")
-    gensim_embedder = create_embedder(
-        embedder_type="gensim",
-        model_type="word2vec"
-    )
-    print("Gensim embedder created successfully!")
-    
-    # Generate one embedding to test
-    test_text = "This is a test"
-    gensim_embedding = gensim_embedder.embed(test_text)
-    print(f"Generated Gensim embedding with shape {gensim_embedding.shape}")
-except Exception as e:
-    print(f"Gensim embedder not available: {e}")
+# (Gensim support removed)
 
 try:
     print("\n=== Trying Scikit-learn (Only if installed) ===")

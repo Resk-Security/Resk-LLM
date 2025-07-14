@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resk-llm"
-version = "1.0.7"
+version = "1.2.0"
 authors = [
-    {name = "Resk", email = "nielzac@proton.me"},
+    {name = "Resk", email = "contact@resk.fr"},
 ]
 description = "Resk-LLM is a robust Python library designed to enhance security and manage context when interacting with LLM APIs. It provides a protective layer for API calls, safeguarding against common vulnerabilities and ensuring optimal performance."
 readme = "README.md"
@@ -42,6 +42,7 @@ dependencies = [
     "pytest-asyncio>=0.23.5",
     "tldextract>=3.4.4",
     "mypy",
+    "jwt",
 ]
 
 [project.urls]
@@ -56,10 +57,6 @@ dev = [
     "build>=0.10.0",
     "twine>=4.0.0"
 ]
-embeddings = [
-    "scikit-learn>=1.2.0",
-    "gensim>=4.3.0",
-]
 all = [
     "tiktoken>=0.5.0",
     "scikit-learn>=1.2.0",
@@ -71,12 +68,10 @@ all = [
     "chromadb>=0.4.22",
     "tldextract>=3.4.4",
     "ipaddress>=1.0.23",
-    "gensim>=4.3.0",
 ]
 vector = [
     "faiss-cpu>=1.7.4",
     "scikit-learn>=1.2.0",
-    "gensim>=4.3.0",
 ]
 vector-all = [
     "faiss-cpu>=1.7.4",

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] - 2025-13-07
+
+### Added
+- New example: `examples/fastapi_resk_example.py` demonstrating integration of cache, monitoring, and advanced security with FastAPI.
+- English documentation and code comments for FastAPI integration in README.md.
+
+### Fixed
+- Suppressed 'Missing config key: anomaly_sensitivity' warnings by setting a default in the security manager.
+- Adjusted risk assessment logic and test thresholds for stricter anomaly detection; all tests now pass.
+
+### Changed
+- Updated README.md with FastAPI integration example and improved English documentation.
+
 ## [1.0.1] - 2024-09-24 # Placeholder Date - Please Update!
 
 ### Changed

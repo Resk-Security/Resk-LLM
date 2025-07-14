@@ -7,7 +7,6 @@ cohere>=4.46.0  # inchangé
 transformers>=4.44.2  # inchangé
 numpy>=2.2.0  # was 1.20.0
 scikit-learn>=1.6.1  # was 1.2.0
-gensim>=4.3.0  # inchangé
 
 # Web Frameworks
 flask>=3.1.0  # was 2.0.0
@@ -34,6 +33,8 @@ typing-extensions>=4.10.0  # was 4.0.0
 urllib3>=2.2.0  # was 1.26.0
 httpx>=0.27.0  # inchangé
 pillow>=10.3.0  # was 9.0.0
+
+PyJWT>=2.0.0  # Pour la gestion des tokens JWT
 
 # Optional Dependencies for Advanced Features
 # tiktoken>=0.5.0  # Pour le comptage de tokens avec les modèles OpenAI
