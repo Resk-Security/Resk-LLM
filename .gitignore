@@ -163,6 +163,7 @@ cython_debug/
 
 # UV
 .uv/
+.cursorignore
 
 # mypy
 .mypy_cache/

@@ -2,21 +2,12 @@
 
 RESK-LLM is a robust Python library designed to enhance security and manage context when interacting with LLM APIs. It provides a protective layer for API calls, safeguarding against common vulnerabilities and ensuring optimal performance.
 
-# New Features
-
-- **RESK Orchestrator**: New centralized `RESK` class that orchestrates all security components with a simple `process_prompt()` method
-- **Comprehensive Examples**: Complete suite of English-language examples for all use cases
-- **llms.txt Support**: Official llms.txt specification file for LLM discoverability
-- **Advanced Monitoring**: Real-time security event logging, metrics collection, and alerting (see `resk_llm/core/monitoring.py`).
-- **Intelligent Caching**: High-performance, component-aware cache for security filters and detectors (see `resk_llm/core/cache.py`).
-- **AI-Powered Security**: Adaptive anomaly detection, risk scoring, and advanced threat detection (see `resk_llm/core/advanced_security.py`).
-
 [![PyPI version](https://img.shields.io/pypi/v/resk-llm.svg)](https://pypi.org/project/resk-llm/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/resk-llm.svg)](https://pypi.org/project/resk-llm/)
-[![License](https://img.shields.io/pypi/l/resk-llm.svg)](https://github.com/ReskLLM/Resk-LLM/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/resk-llm.svg)](https://github.com/Resk-LLM/Resk-LLM/blob/main/LICENSE)
 [![Downloads](https://static.pepy.tech/badge/resk-llm)](https://pepy.tech/project/resk-llm)
-[![GitHub issues](https://img.shields.io/github/issues/ReskLLM/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/issues)
-[![GitHub stars](https://img.shields.io/github/stars/ReskLLM/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/Resk-LLM/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/issues)
+[![GitHub stars](https://img.shields.io/github/stars/Resk-LLM/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/stargazers)
 [![Documentation Status](https://readthedocs.org/projects/resk-llm/badge/?version=latest)](https://resk.readthedocs.io/en/latest/index.html)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)

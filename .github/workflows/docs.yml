@@ -68,12 +68,6 @@ jobs:
         name: documentation
         path: docs/_build/html/
     
-    - name: Check for broken links (non-blocking)
-      run: |
-        cd docs
-        make linkcheck-fast || echo "Link check completed with warnings - continuing deployment"
-      continue-on-error: true
-    
   deploy-docs:
     needs: build-docs
     runs-on: ubuntu-latest
