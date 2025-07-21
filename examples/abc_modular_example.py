@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from resk_llm.core.abc import FilterBase, DetectorBase, SecurityComponent
 
 # Import factory functions for easy component creation
-from resk_llm.factory import (
+from resk_llm.managers.factory import (
     create_heuristic_filter,
     create_text_analyzer,
     create_canary_token_manager,
@@ -36,9 +36,10 @@ from resk_llm.factory import (
 )
 
 # Import specific components we'll use
-from resk_llm.text_analysis import TextAnalyzer
-from resk_llm.heuristic_filter import HeuristicFilter
+from resk_llm.utilities.resk_text_analysis import TextAnalyzer
+from resk_llm.filters.resk_heuristic_filter import HeuristicFilter
 from resk_llm.core.canary_tokens import CanaryTokenManager, CanaryTokenDetector
+from resk_llm.utilities.resk_text_analysis import RESK_TextAnalyzer
 
 # Configure logging
 logging.basicConfig(

@@ -8,6 +8,7 @@ work correctly without requiring PyTorch.
 import pytest
 import numpy as np
 from resk_llm.embedding_utils import create_embedder
+from resk_llm.utilities.vector_db import RESK_VectorDatabase
 
 class TestEmbeddings:
     """Test cases for embedding utilities."""
@@ -16,14 +17,13 @@ class TestEmbeddings:
     def vector_db_class(self):
         """Try to import VectorDatabase or skip tests that need it."""
         try:
-            from resk_llm.vector_db import VectorDatabase
-            return VectorDatabase
+            return RESK_VectorDatabase
         except ImportError:
-            pytest.skip("VectorDatabase not available")
+            pytest.skip("RESK_VectorDatabase not available")
             return None
     
     def test_sklearn_embedder_creation(self):
-        """Test that SklearnEmbedder can be created and trained."""
+        """Test que RESK_Embedder peut être créé et entraîné."""
         try:
             # Create a small corpus for training
             corpus = [
@@ -48,12 +48,12 @@ class TestEmbeddings:
             # Train on corpus
             embedder.train(corpus)
             assert embedder is not None
-            # No isinstance check for SklearnEmbedder
+            # Pas de isinstance check pour RESK_Embedder
         except Exception as e:
-            pytest.fail(f"Failed to create and train SklearnEmbedder: {e}")
+            pytest.fail(f"Impossible de créer et d'entraîner RESK_Embedder: {e}")
     
     def test_sklearn_embedding_shape(self):
-        """Test that SklearnEmbedder produces correct shape embeddings."""
+        """Test que RESK_Embedder produit des embeddings de la bonne forme."""
         # Create and train embedder
         corpus = [
             "This is the first document",

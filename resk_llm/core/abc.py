@@ -153,3 +153,12 @@ class SecurityManagerBase(SecurityComponent[ConfigType], Generic[InputType, Outp
     def generate_report(self) -> Dict[str, Any]:
         """Generate a report summarizing the security checks performed."""
         pass 
+
+class RESK_UtilityBase(ABC):
+    """
+    Abstract Base Class for utility components (embedding, text analysis, etc.).
+    """
+    @abstractmethod
+    def process(self, *args, **kwargs) -> Any:
+        """Process input and return output (to be implemented by utility classes)."""
+        pass 

@@ -1,7 +1,7 @@
 from openai import OpenAI
 from resk_llm.providers_integration import OpenAIProtector
 from resk_llm.resk_context_manager import TokenBasedContextManager
-# from resk_llm.resk_models import RESK_MODELS # RESK_MODELS may be deprecated or moved
+# from resk_llm.models.resk_models import RESK_MODELS # RESK_MODELS may be deprecated or moved
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import pytest

@@ -3,7 +3,6 @@ RESK-LLM: A Comprehensive Toolkit for Securing LLM Agents
 
 RESK-LLM provides a set of components to secure Large Language Model (LLM) based agents
 against various threats, including:
-
 - Prompt injections and jailbreak attempts
 - Malicious requests and manipulations
 - Leakage of sensitive or personal information (PII)
@@ -11,24 +10,14 @@ against various threats, including:
 - Identity spoofing and obfuscation
 - Vector similarity attacks
 - Data leakage via canary tokens
-
-This library is specifically designed to enhance the security of autonomous agents
-by providing robust protections for their interactions with users and systems.
 """
 
 from .version import __version__
 
-# --- Core Abstractions ---
+# --- Core Abstractions & Core Components ---
 from .core.abc import (
-    SecurityComponent,
-    FilterBase,
-    DetectorBase,
-    ProtectorBase,
-    PatternProviderBase,
-    SecurityManagerBase
+    SecurityComponent, FilterBase, DetectorBase, ProtectorBase, PatternProviderBase, SecurityManagerBase
 )
-
-# --- Enhanced Core Components ---
 from .core.cache import IntelligentCache, ParallelProcessor, get_cache, cached_component_call
 from .core.monitoring import (
     ReskMonitor, SecurityEvent, EventType, Severity, AlertRule,
@@ -37,173 +26,90 @@ from .core.monitoring import (
 from .core.advanced_security import (
     AdvancedCrypto, AnomalyDetector, AdaptiveSecurityManager,
     ThreatIntelligence, ThreatLevel, AuthenticationMethod,
-    get_security_manager,
-    ActivityAnalysisResult,
+    get_security_manager, ActivityAnalysisResult
 )
+from .core.canary_tokens import CanaryTokenManager, CanaryTokenDetector
 
-# --- Factory Functions ---
-from .factory import (
-    create_heuristic_filter,
-    create_text_analyzer,
-    create_canary_token_manager,
-    create_vector_database,
-    create_security_manager,
-    create_component
+# --- Models ---
+from .models.resk_models import ModelRegistry, RESK_MODELS, IndividualModelConfig, default_registry
+
+# --- Filters ---
+from .filters.resk_heuristic_filter import RESK_HeuristicFilter
+from .filters.resk_content_policy_filter import RESK_ContentPolicyFilter
+from .filters.resk_word_list_filter import RESK_WordListFilter
+
+# --- Detectors ---
+from .detectors.resk_ip_detector import RESK_IPDetector
+from .detectors.resk_url_detector import RESK_URLDetector
+
+# --- Managers ---
+from .managers.factory import (
+    create_heuristic_filter, create_text_analyzer, create_canary_token_manager,
+    create_vector_database, create_security_manager, create_component
 )
-
-# --- LLM Provider Integrations ---
-from .providers_integration import OpenAIProtector, AnthropicProtector, CohereProtector
-
-# --- Security Filters & Detectors ---
-from .heuristic_filter import HeuristicFilter 
-from .filtering_patterns import ( 
-    check_pii_content, moderate_text, anonymize_text,
-    check_text_for_injections, check_doxxing_attempt, analyze_toxicity, 
-    check_for_obfuscation, sanitize_text_from_obfuscation
+from .managers.resk_context_manager import (
+    RESK_ContextManager, RESK_TokenBasedContextManager, RESK_MessageBasedContextManager, RESK_ContextWindowManager
 )
-from .url_detector import URLDetector
-from .ip_detector import IPDetector
-from .content_policy_filter import ContentPolicyFilter
-from .core.canary_tokens import CanaryTokenDetector
-from .word_list_filter import WordListFilter
+from .managers.prompt_security import PromptSecurityManager
 
-# --- Pattern Management ---
-from .pattern_provider import FileSystemPatternProvider
+# --- Integrations ---
+from .integrations.resk_providers_integration import OpenAIProtector, AnthropicProtector, CohereProtector
+from .integrations.resk_fastapi_integration import FastAPIProtector
+from .integrations.resk_flask_integration import FlaskProtector
+from .integrations.resk_huggingface_integration import HuggingFaceProtector
+from .integrations.resk_langchain_integration import LangChainProtector
 
-# --- Vector Database & Similarity ---
-from .vector_db import VectorDatabase
+# --- Utilities ---
+from .utilities.resk_text_analysis import RESK_TextAnalyzer
+from .utilities.resk_embedding_utils import RESK_Embedder, create_embedder
+from .utilities.resk_vector_db import RESK_VectorDatabase
 
-# --- Token & Context Management ---
-from .resk_context_manager import TokenBasedContextManager
-from .core.canary_tokens import CanaryTokenManager
+# --- Patterns ---
+from .patterns.pattern_provider import FileSystemPatternProvider
+from .patterns.llm_injection_patterns import *
+from .patterns.special_tokens import *
+from .patterns.prohibited_words import *
+from .patterns.prohibited_patterns_eng import *
+from .patterns.prohibited_patterns_fr import *
+from .patterns.emoji_patterns import *
+from .patterns.toxic_content_patterns import *
+from .patterns.pii_patterns import *
 
-# --- Security Management ---
-from .prompt_security import PromptSecurityManager
-
-# --- Text Analysis Utilities ---
-from .text_analysis import TextAnalyzer
-from .filtering_patterns import (
-    normalize_homoglyphs, remove_emojis, replace_emojis_with_description,
-    remove_zalgo, contains_zalgo
-)
-
-# --- Framework Integrations ---
-from .flask_integration import FlaskProtector
-from .fastapi_integration import FastAPIProtector
-
-# --- Autonomous Agent Security ---
-from .autonomous_agent_security import (
-    AgentSecurityManager,
-    AgentPermission,
-    AgentIdentity,
-    SecureAgentExecutor,
-    AGENT_DEFAULT_PERMISSIONS
-)
-
-# --- Embedding Utilities (torch-free alternatives) ---
-from .embedding_utils import (
-    SklearnEmbedder,
-    create_embedder
+# --- Agents ---
+from .agents.autonomous_agent_security import (
+    AgentSecurityManager, AgentPermission, AgentIdentity, SecureAgentExecutor, AGENT_DEFAULT_PERMISSIONS
 )
 
 # Define the public API (organized by category)
 __all__ = [
     # Version
     '__version__',
-
     # Core Abstractions
-    'SecurityComponent',
-    'FilterBase',
-    'DetectorBase',
-    'ProtectorBase',
-    'PatternProviderBase',
-    'SecurityManagerBase',
-    
-    # Enhanced Core Components
-    'IntelligentCache',
-    'ParallelProcessor',
-    'get_cache',
-    'cached_component_call',
-    'ReskMonitor',
-    'SecurityEvent',
-    'EventType',
-    'Severity',
-    'AlertRule',
-    'get_monitor',
-    'log_security_event',
-    'performance_monitor',
-    'AdvancedCrypto',
-    'AnomalyDetector',
-    'AdaptiveSecurityManager',
-    'ThreatIntelligence',
-    'ThreatLevel',
-    'AuthenticationMethod',
-    'get_security_manager',
-    'ActivityAnalysisResult',
-    
-    # Factory Functions
-    'create_heuristic_filter',
-    'create_text_analyzer',
-    'create_canary_token_manager',
-    'create_vector_database',
-    'create_security_manager',
-    'create_component',
-
-    # LLM Provider Protectors
-    'OpenAIProtector',
-    'AnthropicProtector',
-    'CohereProtector',
-
-    # Security Filters & Detectors
-    'HeuristicFilter',
-    'URLDetector',
-    'IPDetector',
-    'ContentPolicyFilter',
-    'CanaryTokenDetector',
-    'WordListFilter',
-    # Functions (to be potentially wrapped in Filter/Detector classes later)
-    'check_pii_content', 
-    'moderate_text', 
-    'anonymize_text',
-    'check_text_for_injections', 
-    'check_doxxing_attempt', 
-    'analyze_toxicity',
-    'check_for_obfuscation', 
-    'sanitize_text_from_obfuscation',
-
-    # Pattern Management
+    'SecurityComponent', 'FilterBase', 'DetectorBase', 'ProtectorBase', 'PatternProviderBase', 'SecurityManagerBase',
+    # Core Components
+    'IntelligentCache', 'ParallelProcessor', 'get_cache', 'cached_component_call',
+    'ReskMonitor', 'SecurityEvent', 'EventType', 'Severity', 'AlertRule',
+    'get_monitor', 'log_security_event', 'performance_monitor',
+    'AdvancedCrypto', 'AnomalyDetector', 'AdaptiveSecurityManager',
+    'ThreatIntelligence', 'ThreatLevel', 'AuthenticationMethod', 'get_security_manager', 'ActivityAnalysisResult',
+    'CanaryTokenManager', 'CanaryTokenDetector',
+    # Models
+    'ModelRegistry', 'RESK_MODELS', 'IndividualModelConfig', 'default_registry',
+    # Filters
+    'RESK_HeuristicFilter', 'RESK_ContentPolicyFilter', 'RESK_WordListFilter',
+    # Detectors
+    'RESK_IPDetector', 'RESK_URLDetector',
+    # Managers
+    'create_heuristic_filter', 'create_text_analyzer', 'create_canary_token_manager',
+    'create_vector_database', 'create_security_manager', 'create_component',
+    'RESK_ContextManager', 'RESK_TokenBasedContextManager', 'RESK_MessageBasedContextManager', 'RESK_ContextWindowManager', 'PromptSecurityManager',
+    # Integrations
+    'OpenAIProtector', 'AnthropicProtector', 'CohereProtector',
+    'FastAPIProtector', 'FlaskProtector', 'HuggingFaceProtector', 'LangchainIntegration',
+    # Utilities
+    'RESK_Embedder', 'create_embedder', 'RESK_TextAnalyzer', 'RESK_VectorDatabase',
+    # Patterns (expose main providers, pas tous les symboles internes)
     'FileSystemPatternProvider',
-
-    # Vector Database & Similarity
-    'VectorDatabase',
-
-    # Token & Context Management
-    'TokenBasedContextManager',
-    'CanaryTokenManager',
-
-    # Security Management
-    'PromptSecurityManager',
-
-    # Text Analysis & Utilities
-    'TextAnalyzer',
-    'normalize_homoglyphs', 
-    'remove_emojis', 
-    'replace_emojis_with_description',
-    'remove_zalgo',
-    'contains_zalgo',
-
-    # Framework Integrations
-    'FlaskProtector',
-    'FastAPIProtector',
-
-    # Autonomous Agent Security
-    'AgentSecurityManager',
-    'AgentPermission',
-    'AgentIdentity',
-    'SecureAgentExecutor',
-    'AGENT_DEFAULT_PERMISSIONS',
-    
-    # Embedding Utilities (torch-free alternatives)
-    'SklearnEmbedder',
-    'create_embedder',
+    # Agents
+    'AgentSecurityManager', 'AgentPermission', 'AgentIdentity', 'SecureAgentExecutor', 'AGENT_DEFAULT_PERMISSIONS',
 ]

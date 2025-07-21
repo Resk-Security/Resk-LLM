@@ -15,11 +15,12 @@ from resk_llm.heuristic_filter import HeuristicFilter
 from resk_llm.vector_db import VectorDatabase
 from resk_llm.core.canary_tokens import CanaryTokenManager, CanaryTokenDetector
 from resk_llm.prompt_security import PromptSecurityManager
-from resk_llm.text_analysis import TextAnalyzer
-from resk_llm.content_policy_filter import ContentPolicyFilter
+from resk_llm.utilities.text_analysis import RESK_TextAnalyzer
+from resk_llm.filters.content_policy_filter import RESK_ContentPolicyFilter
 from resk_llm.url_detector import URLDetector
 from resk_llm.ip_detector import IPDetector
 from resk_llm.pattern_provider import FileSystemPatternProvider
+from resk_llm.utilities.vector_db import RESK_VectorDatabase
 
 class TestHeuristicFilter(unittest.TestCase):
     """Tests for the heuristic-based filtering component."""
@@ -102,7 +103,7 @@ class TestVectorDatabase(unittest.TestCase):
             return embedding
         
         self.embedding_fn = mock_embedding_fn
-        self.vector_db = VectorDatabase(embedding_dim=128, similarity_threshold=0.7)
+        self.vector_db = RESK_VectorDatabase(embedding_dim=128, similarity_threshold=0.7)
         
         # Example attacks for testing
         self.example_attacks = [
@@ -194,7 +195,7 @@ class TestVectorDatabase(unittest.TestCase):
             self.assertTrue(save_result, "Saving database should succeed")
             
             # Create a new database and load from file
-            new_db = VectorDatabase(embedding_dim=128)
+            new_db = RESK_VectorDatabase(embedding_dim=128)
             load_result = new_db.load_from_disk(tmp_path)
             
             self.assertTrue(load_result, "Loading database should succeed")
@@ -459,7 +460,7 @@ class TestTextAnalyzer(unittest.TestCase):
     """Tests for TextAnalyzer detecting invisible text and homoglyphs."""
 
     def setUp(self):
-        self.analyzer = TextAnalyzer()
+        self.analyzer = RESK_TextAnalyzer()
         
     def test_detect_invisible_text(self):
         """Test detecting invisible text."""
@@ -548,9 +549,9 @@ class TestContentPolicyFilter(unittest.TestCase):
 
 
         # Initialize the filter with the loaded pattern data directly in the config
-        self.filter = ContentPolicyFilter(config=patterns_data)
+        self.filter = RESK_ContentPolicyFilter(config=patterns_data)
         # Remove the old initialization that passed the provider and mapping names
-        # self.filter = ContentPolicyFilter(config={
+        # self.filter = RESK_ContentPolicyFilter(config={
         #     'pattern_provider': self.provider,
         #     'competitor_list_name': 'competitors',
         #     'banned_topic_list_name': 'banned_topics',

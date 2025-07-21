@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from resk_llm.url_detector import URLDetector
 from resk_llm.ip_detector import IPDetector
 from resk_llm.embedding_utils import create_embedder
-from resk_llm.vector_db import VectorDatabase
-from resk_llm.content_policy_filter import ContentPolicyFilter
+from resk_llm.utilities.vector_db import RESK_VectorDatabase
+from resk_llm.filters.content_policy_filter import RESK_ContentPolicyFilter
 
 def test_url_detector():
     """Test URL detector functionality."""
@@ -116,7 +116,7 @@ def test_embeddings():
             
         # Test vector database
         print("Creating vector database...")
-        db = VectorDatabase(embedding_dim=embedding.shape[0], similarity_threshold=0.7)
+        db = RESK_VectorDatabase(embedding_dim=embedding.shape[0], similarity_threshold=0.7)
         
         # Add entries
         attack_patterns = [
@@ -165,7 +165,7 @@ def test_content_policy():
     
     try:
         # Create content policy filter
-        filter = ContentPolicyFilter()
+        filter = RESK_ContentPolicyFilter()
         
         # Configure filter
         filter.competitors = {

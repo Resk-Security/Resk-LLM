@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.3.0] - 2025-01-21
+
+### Added
+- **New RESK Orchestrator Class**: Centralized `RESK` class that orchestrates all security components (filters, detectors, managers, integrations) with a simple `process_prompt()` method
+- **Comprehensive Example Suite**: Complete set of English-language examples demonstrating all use cases:
+  - `simple_example.py`: Basic prompt security with RESK orchestrator
+  - `fastapi_resk_example.py`: FastAPI endpoint security integration
+  - `huggingface_resk_example.py`: HuggingFace model protection
+  - `patterns_and_layers_example.py`: Custom pattern and security layer configuration
+  - `logging_monitoring_example.py`: Monitoring and logging setup
+  - `agent_security_example.py`: Secure agent execution
+  - `test_library_example.py`: Comprehensive library testing
+  - `quick_test_example.py`: Quick verification script
+- **llms.txt File**: Official llms.txt specification file for LLM discoverability and documentation
+- **Improved Architecture**: Enhanced SOLID principles implementation with dataclasses and dependency injection
+- **Uniform Pattern Access**: Standardized pattern provider usage across all filters for better maintainability
+
+### Changed
+- **Enhanced Output Format**: Improved `process_prompt()` method returns structured dictionaries instead of nested tuples for better readability
+- **Better Error Handling**: Improved handling of None inputs and edge cases in security components
+- **Updated Imports**: Fixed import paths and class names for better consistency
+- **Documentation**: Added comprehensive tips for avoiding torch dependencies and vector DB features
+
+### Fixed
+- **Import Errors**: Fixed missing class imports and incorrect module paths
+- **EventType Enum**: Corrected monitoring test to use valid EventType values
+- **Pattern Provider**: Fixed FileSystemPatternProvider instantiation with correct parameters
+- **Monitoring Methods**: Updated to use correct method names (`get_security_summary` instead of `get_security_dashboard`)
+
+### Technical Improvements
+- **SOLID Principles**: Refactored components to follow SOLID principles with proper dependency injection
+- **Abstract Interfaces**: Enhanced abstract base classes for better extensibility
+- **Type Safety**: Improved type hints and error handling throughout the codebase
+- **Performance**: Optimized pattern loading and caching mechanisms
+
 ## [1.2.1] - 2025-13-07
 
 ### Added
