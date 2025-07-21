@@ -11,6 +11,14 @@ import warnings
 from typing import Dict, List, Any, Optional, Union, Callable, TypeVar, Type, cast, Any
 
 from transformers import AutoTokenizer, PreTrainedTokenizer
+
+# Conditional import for PyTorch-dependent components
+try:
+    from transformers import AutoModelForCausalLM
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    AutoModelForCausalLM = None
 from PIL import Image
 
 from resk_llm.filters.resk_word_list_filter import RESK_WordListFilter
@@ -83,12 +91,14 @@ class HuggingFaceProtector(ProtectorBase[str, str, HuggingFaceProtectorConfig]):
         
         # Initialize model (for testing purposes)
         self.model = None
-        try:
-            from transformers import AutoModelForCausalLM
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
-        except Exception as e:
-            warnings.warn(f"Could not load model for {self.model_name}: {str(e)}")
-            self.model = None
+        if TORCH_AVAILABLE and AutoModelForCausalLM is not None:
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+            except Exception as e:
+                warnings.warn(f"Could not load model for {self.model_name}: {str(e)}")
+                self.model = None
+        else:
+            warnings.warn("PyTorch not available, model loading skipped")
         
         # Initialize ReskWordsLists
         self.resk_words_lists = RESK_WordListFilter()
@@ -164,9 +174,9 @@ class HuggingFaceProtector(ProtectorBase[str, str, HuggingFaceProtectorConfig]):
         
         # Check for malicious content if detection is enabled
         if self.enable_detection:
-            passed, reason, _ = self.resk_words_lists.filter(sanitized_text)
-            if not passed:
-                raise ValueError(f"Malicious content detected: {reason or 'Unknown word list violation'}")
+            result = self.resk_words_lists.filter(sanitized_text)
+            if not result.is_safe:
+                raise ValueError(f"Malicious content detected: {result.reason or 'Unknown word list violation'}")
         
         # Check token length if tokenizer is available
         if self.tokenizer:
@@ -303,11 +313,6 @@ class HuggingFaceProtector(ProtectorBase[str, str, HuggingFaceProtectorConfig]):
         except Exception as e:
             logger.error(f"Error processing HuggingFace request: {e}")
             # Return error result
-            class ProcessResult:
-                def __init__(self, is_safe: bool, response: str):
-                    self.is_safe = is_safe
-                    self.response = response
-            
             return ProcessResult(False, f"Error: {str(e)}")
 
 

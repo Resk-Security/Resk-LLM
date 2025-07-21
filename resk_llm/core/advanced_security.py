@@ -313,7 +313,7 @@ class AnomalyDetector:
         """
         self.sensitivity = max(0.0, min(1.0, sensitivity))
         self.user_profiles: Dict[str, UserBehaviorProfile] = {}
-        self.threat_patterns: Dict[str, Dict[str, Any]] = {}
+        self.threat_patterns: List[Dict[str, Any]] = []
         self._initialize_threat_patterns()
         
         # Training data storage
@@ -322,7 +322,7 @@ class AnomalyDetector:
     
     def _initialize_threat_patterns(self) -> None:
         """Stub for initializing threat patterns."""
-        self.threat_patterns = {}
+        self.threat_patterns = []
 
     def train(self, training_data: List[Dict[str, Any]]) -> None:
         """
@@ -373,7 +373,7 @@ class AnomalyDetector:
     
     def analyze_activity(self, user_id: str, activity: Dict[str, Any]) -> ActivityAnalysisResult:
         """Analyze user activity for anomalies."""
-        results: ActivityAnalysisResult = {
+        results: Dict[str, Any] = {
             'user_id': user_id,
             'anomaly_score': 0.0,
             'threat_level': ThreatLevel.MINIMAL,
@@ -385,7 +385,7 @@ class AnomalyDetector:
             self.user_profiles[user_id] = UserBehaviorProfile(user_id=user_id)
         profile = self.user_profiles[user_id]
         # Calculate behavioral anomaly score
-        anomaly_score_val = results['anomaly_score']
+        anomaly_score_val: float = results['anomaly_score']
         behavioral_score = float(profile.calculate_anomaly_score(activity))
         anomaly_score_val += behavioral_score * 0.7  # Increased weight for test alignment
         results['anomaly_score'] = anomaly_score_val
@@ -407,18 +407,18 @@ class AnomalyDetector:
                         ThreatLevel.HIGH: 0.7,
                         ThreatLevel.CRITICAL: 1.0
                     }
-                    anomaly_score_val = results['anomaly_score']
-                    anomaly_score_val += float(severity_weights[pattern_info['severity']]) * 0.7  # Increased weight
-                    results['anomaly_score'] = anomaly_score_val
+                    current_score: float = results['anomaly_score']
+                    current_score += float(severity_weights[pattern_info['severity']]) * 0.7  # Increased weight
+                    results['anomaly_score'] = current_score
         # Determine overall threat level
-        anomaly_score_val = results['anomaly_score']
-        if anomaly_score_val >= 0.9:
+        final_score: float = results['anomaly_score']
+        if final_score >= 0.9:
             results['threat_level'] = ThreatLevel.CRITICAL
-        elif anomaly_score_val >= 0.7:
+        elif final_score >= 0.7:
             results['threat_level'] = ThreatLevel.HIGH
-        elif anomaly_score_val >= 0.5:
+        elif final_score >= 0.5:
             results['threat_level'] = ThreatLevel.MEDIUM
-        elif anomaly_score_val >= 0.3:
+        elif final_score >= 0.3:
             results['threat_level'] = ThreatLevel.LOW
         # Generate recommendations
         if results['threat_level'] in [ThreatLevel.HIGH, ThreatLevel.CRITICAL]:
@@ -429,7 +429,7 @@ class AnomalyDetector:
             results['recommendations'].append('Monitor closely')
         # Update user profile
         profile.update_behavior(activity)
-        return results
+        return results  # type: ignore
     
     def add_threat_pattern(self, name: str, pattern: str, severity: ThreatLevel,
                           condition: Optional[Callable[[Dict[str, Any]], bool]] = None) -> None:

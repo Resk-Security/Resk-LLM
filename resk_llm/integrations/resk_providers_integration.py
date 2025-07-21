@@ -413,11 +413,6 @@ class OpenAIProtector(BaseProviderProtector):
         except Exception as e:
             logger.error(f"Error processing OpenAI request: {e}")
             # Return error result - should be False for security
-            class ProcessResult:
-                def __init__(self, is_safe: bool, response: str):
-                    self.is_safe = is_safe
-                    self.response = response
-            
             return ProcessResult(False, f"Error: {str(e)}")
 
     def _validate_config(self) -> None:
@@ -647,11 +642,6 @@ class AnthropicProtector(BaseProviderProtector):
         except Exception as e:
             logger.error(f"Error processing Anthropic request: {e}")
             # Return error result
-            class ProcessResult:
-                def __init__(self, is_safe: bool, response: str):
-                    self.is_safe = is_safe
-                    self.response = response
-            
             return ProcessResult(False, f"Error: {str(e)}")
 
     def _validate_config(self) -> None:
@@ -828,11 +818,6 @@ class CohereProtector(BaseProviderProtector):
         except Exception as e:
             logger.error(f"Error processing Cohere request: {e}")
             # Return error result
-            class ProcessResult:
-                def __init__(self, is_safe: bool, response: str):
-                    self.is_safe = is_safe
-                    self.response = response
-            
             return ProcessResult(False, f"Error: {str(e)}")
 
     def _validate_config(self) -> None:

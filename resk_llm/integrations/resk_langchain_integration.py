@@ -311,11 +311,11 @@ class LangChainProtector(ProtectorBase[Union[BasePromptTemplate, Chain, BaseMess
         
         # Check for malicious content if detection is enabled
         if self.enable_detection:
-            # Use the filter method and check the 'passed' status
-            passed, reason, _ = self.resk_words_lists.filter(text)
-            if not passed:
-                # If not passed, raise ValueError with the reason
-                raise ValueError(f"Malicious content detected: {reason or 'Unknown word list violation'}")
+            # Use the filter method and check the result
+            result = self.resk_words_lists.filter(text)
+            if not result.is_safe:
+                # If not safe, raise ValueError with the reason
+                raise ValueError(f"Malicious content detected: {result.reason or 'Unknown word list violation'}")
         
         return text
     

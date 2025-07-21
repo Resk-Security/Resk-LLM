@@ -97,6 +97,12 @@ class FlaskProtector(ProtectorBase[Union[FlaskApp, Dict[str, Any], List[Any], st
         
         self.exempt_routes = set(self.config.get('exempt_routes', []))
         
+        # Add missing attributes that are referenced later
+        self.enable_patterns_api = self.config.get('enable_patterns_api', False)
+        self.patterns_api_prefix = self.config.get('patterns_api_prefix', '/api/patterns')
+        self.custom_patterns_dir = self.config.get('custom_patterns_dir')
+        self.patterns_api_auth = self.config.get('patterns_api_auth')
+        
         # Initialize app if provided
         app = self.config.get('app')
         if app is not None:
@@ -159,7 +165,7 @@ class FlaskProtector(ProtectorBase[Union[FlaskApp, Dict[str, Any], List[Any], st
         Returns:
             Dictionary with validation results
         """
-        result = {
+        result: Dict[str, Any] = {
             'valid': True,
             'issues': [],
             'blocked': False
@@ -202,7 +208,7 @@ class FlaskProtector(ProtectorBase[Union[FlaskApp, Dict[str, Any], List[Any], st
         Returns:
             Dictionary with validation results
         """
-        result = {
+        result: Dict[str, Any] = {
             'valid': True,
             'issues': [],
             'modified': False
@@ -440,14 +446,14 @@ class FlaskProtector(ProtectorBase[Union[FlaskApp, Dict[str, Any], List[Any], st
                     
             # Apply word list filter (example)
             if self.word_list_filter:
-                passed, reason, filtered_text = self.word_list_filter.filter(sanitized_text)
-                if not passed:
+                result = self.word_list_filter.filter(sanitized_text)
+                if not result.is_safe:
                     # Log and return original text (or potentially modify/raise)
-                    logger.warning(f"WordListFilter check failed during sanitization: {reason}. Returning original text.")
+                    logger.warning(f"WordListFilter check failed during sanitization: {result.reason}. Returning original text.")
                     # return "[REDACTED]" # Option: Replace if blocked
                 else:
                      # Use text returned by filter (potentially unchanged)
-                    sanitized_text = filtered_text
+                    sanitized_text = result.data
             
             # TODO: Add other basic sanitization if needed (e.g., HTML escaping)
             # sanitized_text = html.escape(sanitized_text)

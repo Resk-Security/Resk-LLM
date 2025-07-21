@@ -261,5 +261,5 @@ class RESK_WordListFilter(FilterBase[str, FilterResult, WordListFilterConfig]):
         Returns:
             Warning message if forbidden words are found, None otherwise
         """
-        passed, reason, _ = self.filter(text)
-        return reason if not passed else None 
+        result = self.filter(text)
+        return result.reason if not result.is_safe else None 

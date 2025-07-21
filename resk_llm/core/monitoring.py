@@ -156,6 +156,12 @@ class ReskMonitor:
         self.performance_data: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         self.metrics_lock = threading.RLock()
         
+        # Cache and performance tracking
+        self._cache_stats: Dict[str, int] = defaultdict(int)
+        self._response_times: List[float] = []
+        self._request_counts: Dict[int, int] = defaultdict(int)
+        self._error_counts: Dict[int, int] = defaultdict(int)
+        
         # Alert system
         self.alert_rules: List[AlertRule] = []
         self.alert_handlers: List[Callable[[SecurityEvent], None]] = []
@@ -164,7 +170,7 @@ class ReskMonitor:
         self._setup_default_alert_rules()
         
         # Start monitoring thread if real-time is enabled
-        self._monitoring_thread = None
+        self._monitoring_thread: Optional[threading.Thread] = None
         if enable_real_time:
             self._start_monitoring()
         
@@ -284,8 +290,8 @@ class ReskMonitor:
                    time_range: Optional[Tuple[float, float]] = None,
                    limit: int = 100) -> List[SecurityEvent]:
         """Get events matching the specified criteria."""
-        with self._events_lock:
-            events = list(self._events)
+        with self.event_lock:
+            events = list(self.events)
         
         # Apply filters
         if event_type:
@@ -440,29 +446,6 @@ class ReskMonitor:
     def log_event(self, event: SecurityEvent) -> None:
         """Log a security event (alias for record_event)."""
         self.record_event(event)
-    
-    def get_events(self, limit: int = 100) -> List[SecurityEvent]:
-        """Get recent security events."""
-        with self.event_lock:
-            events = list(self.events)
-            # Sort by timestamp (most recent first) and limit
-            events.sort(key=lambda e: e.timestamp, reverse=True)
-            return events[:limit]
-    
-    def get_current_metrics(self) -> PerformanceMetrics:
-        """Get current performance metrics."""
-        # This is a simplified implementation
-        return PerformanceMetrics(
-            avg_response_time=0.5,
-            max_response_time=2.0,
-            min_response_time=0.1,
-            total_requests=len(self.events),
-            error_rate=0.02,
-            throughput=100.0,
-            cache_hit_rate=0.85,
-            memory_usage=50.0,
-            cpu_usage=25.0
-        )
 
 # Global monitor instance
 _global_monitor = ReskMonitor()

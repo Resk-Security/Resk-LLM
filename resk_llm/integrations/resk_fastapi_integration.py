@@ -130,13 +130,13 @@ class FastAPIProtector(ProtectorBase[Any, Any, FastAPIProtectorConfig]):
         """
         async def security_middleware(request: Request, call_next: Callable):
             # Validate request
-            await self.validate_request(request)
+            self.validate_request(request)
             
             # Get response
             response = await call_next(request)
             
             # Validate response
-            await self.validate_response(response)
+            self.validate_response(response)
             
             return response
         
@@ -152,7 +152,7 @@ class FastAPIProtector(ProtectorBase[Any, Any, FastAPIProtectorConfig]):
         Returns:
             Dictionary with validation results
         """
-        result = {
+        result: Dict[str, Any] = {
             'valid': True,
             'issues': [],
             'blocked': False
@@ -214,7 +214,7 @@ class FastAPIProtector(ProtectorBase[Any, Any, FastAPIProtectorConfig]):
         Returns:
             Dictionary with validation results
         """
-        result = {
+        result: Dict[str, Any] = {
             'valid': True,
             'issues': [],
             'modified': False
@@ -415,15 +415,15 @@ class FastAPIProtector(ProtectorBase[Any, Any, FastAPIProtectorConfig]):
             
             # Apply word list filter (example)
             if self.word_list_filter:
-                passed, reason, filtered_text = self.word_list_filter.filter(sanitized_text)
-                if not passed:
+                result = self.word_list_filter.filter(sanitized_text)
+                if not result.is_safe:
                     # Decide on action: log, raise, replace? For now, log and keep original.
                     # This behavior might need configuration.
-                    self.logger.warning(f"WordListFilter check failed during sanitization: {reason}. Returning original text for now.")
+                    self.logger.warning(f"WordListFilter check failed during sanitization: {result.reason}. Returning original text for now.")
                     # return "[REDACTED]" # Example: Replace if blocked
                 else:
                     # Use the text returned by the filter (might be unchanged)
-                    sanitized_text = filtered_text 
+                    sanitized_text = result.data 
             
             # TODO: Add other basic sanitization if needed (e.g., HTML escaping?)
             # sanitized_text = html.escape(sanitized_text)
@@ -527,11 +527,11 @@ class FastAPIProtector(ProtectorBase[Any, Any, FastAPIProtectorConfig]):
                         
                         # Forbidden word check using WordListFilter
                         if check_prompt and self.word_list_filter:
-                            passed, reason, _ = self.word_list_filter.filter(content)
-                            if not passed:
+                            result = self.word_list_filter.filter(content)
+                            if not result.is_safe:
                                 raise HTTPException(
                                     status_code=status.HTTP_403_FORBIDDEN,
-                                    detail={"error": reason or "Prohibited content detected", "status": "forbidden"}
+                                    detail={"error": result.reason or "Prohibited content detected", "status": "forbidden"}
                                 )
                         
                         # Advanced injection check with filtering_patterns
