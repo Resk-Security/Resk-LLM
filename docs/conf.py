@@ -66,9 +66,10 @@ autoapi_options = [
     'special-members',
     'imported-members',
 ]
-autoapi_ignore = ['*migrations*', '*/tests/*', '*/__pycache__/*']
+autoapi_ignore = ['*migrations*', '*/tests/*', '*/__pycache__/*', '*/conftest.py']
 autoapi_keep_files = False
 autoapi_add_toctree_entry = True
+autoapi_generate_api_docs = True
 autoapi_type_aliases = {
     'Dict': 'Dict',
     'List': 'List',
@@ -105,7 +106,7 @@ html_theme_options = {
     'sticky_navigation': True,
     'includehidden': True,
     'titles_only': False,
-    'github_url': 'https://github.com/your-username/resk-llm',  # Update with your repo
+    'github_url': 'https://github.com/Resk-Security/Resk-LLM',
     'display_version': True,
     'prev_next_buttons_location': 'bottom',
     'style_external_links': True,
@@ -134,6 +135,22 @@ epub_show_urls = 'footnote'
 
 # -- Extension configuration -------------------------------------------------
 todo_include_todos = True
+
+# Optimizations for faster builds
+autodoc_default_options = {
+    'members': True,
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True,
+    'exclude-members': '__weakref__'
+}
+
+# Disable some slow features in CI
+if os.environ.get('CI'):
+    # Disable viewcode in CI for faster builds
+    extensions.remove('sphinx.ext.viewcode')
+    # Disable todo in CI
+    todo_include_todos = False
 
 # -- ReadTheDocs specific configuration --------------------------------------
 # On ReadTheDocs, we need to install the package in editable mode

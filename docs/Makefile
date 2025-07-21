@@ -35,6 +35,12 @@ linkcheck:
 	@echo "Link check complete; look for any errors in the above output " \
 	      "or in $(BUILDDIR)/linkcheck/output.txt."
 
+# Fast linkcheck (skip rate-limited sites)
+linkcheck-fast:
+	$(SPHINXBUILD) -b linkcheck -D linkcheck_ignore=linkcheck_ignore.txt $(SPHINXOPTS) $(SOURCEDIR) $(BUILDDIR)/linkcheck
+	@echo
+	@echo "Fast link check complete (rate-limited sites ignored)."
+
 # Auto-generate API documentation
 api:
 	@echo "Generating API documentation..."

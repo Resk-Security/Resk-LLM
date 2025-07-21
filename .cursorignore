@@ -19,6 +19,5 @@ __pycache__/
 .env.test.local
 .env.production.local
 dist/
-docs/
 resk_llm.egg-info/
 IMPROVEMENTS.md
