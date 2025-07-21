@@ -8,9 +8,10 @@ on:
   pull_request:
     branches: [main]
 
-# Remove id-token permission, keep contents: write for GH Release
+# Permissions for GitHub Releases and PyPI publishing
 permissions:
   contents: write # Required for creating GitHub Releases
+  id-token: write # Required for PyPI publishing
 
 jobs:
   test:
