@@ -86,6 +86,11 @@ class IntelligentCache:
             'IPDetector': 3600.0,       # 1 hour
         }
     
+    def __len__(self) -> int:
+        """Return the number of cached entries."""
+        with self._lock:
+            return len(self._cache)
+    
     def _generate_key(self, component_name: str, input_data: Any, **kwargs) -> str:
         """Generate a unique cache key for the given input."""
         try:
@@ -106,9 +111,49 @@ class IntelligentCache:
             # Fallback to simple string representation
             return f"{component_name}:{hash(str(input_data))}"
     
-    def get(self, component_name: str, input_data: Any, **kwargs) -> Optional[Any]:
+    def get(self, key: str, default: Any = None) -> Optional[Any]:
         """
-        Retrieve a cached result.
+        Retrieve a cached result using a simple key.
+        
+        Args:
+            key: The cache key
+            default: Default value if key not found
+            
+        Returns:
+            Cached result or default if not found/expired
+        """
+        with self._lock:
+            # Check if we need cleanup
+            if time.time() - self._last_cleanup > self.cleanup_interval:
+                self._cleanup_expired()
+            
+            entry = self._cache.get(key)
+            if entry is None:
+                if self.enable_stats:
+                    self._stats['misses'] += 1
+                return default
+            
+            # Check if expired
+            ttl = self.default_ttl
+            if entry.is_expired(ttl):
+                del self._cache[key]
+                if self.enable_stats:
+                    self._stats['misses'] += 1
+                    self._stats['expired_removals'] += 1
+                return default
+            
+            # Update access info and move to end (LRU)
+            entry.touch()
+            self._cache.move_to_end(key)
+            
+            if self.enable_stats:
+                self._stats['hits'] += 1
+            
+            return entry.value
+    
+    def get_component(self, component_name: str, input_data: Any, **kwargs) -> Optional[Any]:
+        """
+        Retrieve a cached result for a component.
         
         Args:
             component_name: Name of the security component
@@ -149,9 +194,35 @@ class IntelligentCache:
             
             return entry.value
     
-    def set(self, component_name: str, input_data: Any, result: Any, **kwargs) -> None:
+    def set(self, key: str, value: Any, **kwargs) -> None:
         """
-        Store a result in the cache.
+        Store a result in the cache using a simple key.
+        
+        Args:
+            key: The cache key
+            value: Value to cache
+            **kwargs: Additional parameters
+        """
+        with self._lock:
+            # Check if we need to evict entries
+            if len(self._cache) >= self.max_size:
+                self._evict_lru()
+            
+            # Store the new entry
+            entry = CacheEntry(
+                value=value,
+                timestamp=time.time(),
+                hash_key=key
+            )
+            
+            self._cache[key] = entry
+            
+            if self.enable_stats:
+                self._stats['total_sets'] += 1
+    
+    def set_component(self, component_name: str, input_data: Any, result: Any, **kwargs) -> None:
+        """
+        Store a result in the cache for a component.
         
         Args:
             component_name: Name of the security component
@@ -177,6 +248,12 @@ class IntelligentCache:
             
             if self.enable_stats:
                 self._stats['total_sets'] += 1
+    
+    def delete(self, key: str) -> None:
+        """Delete a specific key from the cache."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
     
     def _evict_lru(self) -> None:
         """Evict the least recently used entry."""
@@ -321,11 +398,15 @@ def cached_component_call(component_name: str, cache_key_data: Any = None):
             # Generate cache key from arguments
             if cache_key_data is not None:
                 key_data = cache_key_data
+            elif len(args) > 1:
+                key_data = args[1]  # Skip 'self' argument
+            elif 'input_data' in kwargs:
+                key_data = kwargs.get('input_data', '')
             else:
-                key_data = args[1] if len(args) > 1 else kwargs.get('input_data', '')
+                key_data = str(args) + str(kwargs)
             
             # Try to get from cache
-            cached_result = get_cache().get(component_name, key_data, **kwargs)
+            cached_result = get_cache().get_component(component_name, key_data, **kwargs)
             if cached_result is not None:
                 return cached_result
             
@@ -333,7 +414,7 @@ def cached_component_call(component_name: str, cache_key_data: Any = None):
             result = func(*args, **kwargs)
             
             # Cache the result
-            get_cache().set(component_name, key_data, result, **kwargs)
+            get_cache().set_component(component_name, key_data, result, **kwargs)
             
             return result
         return wrapper

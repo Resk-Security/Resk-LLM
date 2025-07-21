@@ -20,12 +20,13 @@ class RESK_VectorDatabase(DetectorBase[np.ndarray, Dict[str, Any]]):
     embeddings: list = field(default_factory=list)
     metadata: list = field(default_factory=list)
     external_db: Any = None
-    external_db_type: str = None
+    external_db_type: Optional[str] = None
     external_db_client: Any = None
     normalize_vectors: bool = False
     total_queries: int = 0
     total_matches: int = 0
     creation_time: Any = field(default_factory=lambda: datetime.now())
+    logger: Any = field(default_factory=lambda: logging.getLogger(__name__))
 
     def __post_init__(self):
         self.embedding_dim = self.config.get('embedding_dim', self.embedding_dim)

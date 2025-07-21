@@ -995,17 +995,17 @@ class AgentIdentity:
 
 class SecureAgentExecutor:
     """
-    Secure executor for autonomous agents.
+    Secure executor for agent actions.
     """
-    def __init__(self, security_manager: AgentSecurityManager, agent_id: str):
+    def __init__(self, agent_manager: AgentSecurityManager, agent_id: str):
         """
         Initialize the secure executor.
         
         Args:
-            security_manager: Security manager
-            agent_id: Agent ID
+            agent_manager: The security manager for the agent
+            agent_id: The ID of the agent
         """
-        self.security_manager = security_manager
+        self.security_manager = agent_manager
         self.agent_id = agent_id
         
     def execute(self, action: str, action_type: str, resource: Optional[str] = None) -> Dict[str, Any]:

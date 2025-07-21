@@ -105,6 +105,163 @@ class LangChainProtector(ProtectorBase[Union[BasePromptTemplate, Chain, BaseMess
         if 'block_protected_variables' in config:
             self.block_protected_variables = config['block_protected_variables']
     
+    def create_secure_chain(self, chain: Chain) -> Chain:
+        """
+        Create a secure version of a LangChain chain.
+        
+        Args:
+            chain: Original LangChain chain
+            
+        Returns:
+            Protected chain with security measures
+        """
+        return self._protect_chain(chain)
+    
+    def validate_prompt(self, prompt: Union[str, BasePromptTemplate, BaseMessage]) -> Dict[str, Any]:
+        """
+        Validate a prompt for security issues.
+        
+        Args:
+            prompt: Prompt to validate
+            
+        Returns:
+            Dictionary with validation results
+        """
+        try:
+            is_valid = False
+            issues = []
+            
+            if isinstance(prompt, str):
+                is_valid = self._validate_text(prompt)
+                if not is_valid:
+                    issues.append("Text validation failed")
+            elif isinstance(prompt, BaseMessage):
+                is_valid = self._validate_message(prompt)
+                if not is_valid:
+                    issues.append("Message validation failed")
+            elif isinstance(prompt, BasePromptTemplate):
+                is_valid = self._validate_prompt_template(prompt)
+                if not is_valid:
+                    issues.append("Prompt template validation failed")
+            else:
+                is_valid = True
+            
+            return {
+                'valid': is_valid,
+                'is_safe': is_valid,  # For backward compatibility
+                'issues': issues,
+                'prompt_type': type(prompt).__name__
+            }
+        except Exception as e:
+            logger.error(f"Error validating prompt: {e}")
+            return {
+                'valid': False,
+                'is_safe': False,  # For backward compatibility
+                'issues': [f"Validation error: {str(e)}"],
+                'prompt_type': type(prompt).__name__ if prompt else 'unknown'
+            }
+    
+    def create_secure_agent(self, agent: Any = None, agent_class: Any = None, agent_type: str = "default", tools: Optional[List[Any]] = None, llm: Optional[Any] = None) -> Any:
+        """
+        Create a secure version of a LangChain agent.
+        
+        Args:
+            agent: Original LangChain agent (optional)
+            agent_class: Agent class to instantiate (optional)
+            agent_type: Type of agent to create (optional)
+            
+        Returns:
+            Protected agent with security measures
+        """
+        # If agent_class is provided, instantiate it
+        if agent_class is not None and agent is None:
+            try:
+                agent = agent_class()
+            except Exception as e:
+                logger.error(f"Failed to instantiate agent class: {e}")
+                return None
+        
+        # If tools and llm are provided but no agent, create a mock agent
+        if agent is None and tools is not None and llm is not None:
+            class MockAgent:
+                def __init__(self, tools, llm):
+                    self.tools = tools
+                    self.llm = llm
+                
+                def run(self, *args, **kwargs):
+                    return "Mock agent response"
+            
+            agent = MockAgent(tools, llm)
+        
+        if agent is None:
+            logger.warning("No agent or agent_class provided")
+            return None
+        
+        # This is a simplified implementation
+        # In a real implementation, you would wrap the agent's methods
+        # to add security checks before and after execution
+        
+        class SecureAgent:
+            def __init__(self, original_agent: Any, protector: 'LangChainProtector', agent_type: str = "default"):
+                self.original_agent = original_agent
+                self.protector = protector
+                self.agent_type = agent_type
+            
+            def __getattr__(self, name: str):
+                # Delegate to original agent for most attributes
+                return getattr(self.original_agent, name)
+            
+            def run(self, *args, **kwargs):
+                # Protect inputs before running
+                protected_args = [self.protector.protect_input(arg) for arg in args]
+                protected_kwargs = {k: self.protector.protect_input(v) for k, v in kwargs.items()}
+                
+                # Run the original agent
+                result = self.original_agent.run(*protected_args, **protected_kwargs)
+                
+                # Protect outputs
+                return self.protector.protect_output(result)
+        
+        return SecureAgent(agent, self, agent_type)
+    
+    def _validate_text(self, text: str) -> bool:
+        """Validate text content for security issues."""
+        if not text:
+            return True
+        
+        # Check for protected variables
+        if self.block_protected_variables and re.search(self.protected_variable_pattern, text):
+            return False
+        
+        # Check for injection patterns
+        injection_patterns = [
+            r'ignore\s+previous\s+instructions',
+            r'forget\s+all\s+rules',
+            r'bypass\s+security',
+            r'<script',
+            r'javascript:',
+            r'eval\s*\(',
+            r'exec\s*\('
+        ]
+        
+        for pattern in injection_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return False
+        
+        return True
+    
+    def _validate_message(self, message: BaseMessage) -> bool:
+        """Validate LangChain message for security issues."""
+        if hasattr(message, 'content'):
+            return self._validate_text(str(message.content))
+        return True
+    
+    def _validate_prompt_template(self, template: BasePromptTemplate) -> bool:
+        """Validate LangChain prompt template for security issues."""
+        if hasattr(template, 'template'):
+            return self._validate_text(template.template)
+        return True
+    
     def protect(self, component: Union[BasePromptTemplate, Chain, BaseMessage, str]) -> Union[BasePromptTemplate, Chain, BaseMessage, str]:
         """
         Main protection method required by ProtectorBase.

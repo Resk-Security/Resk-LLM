@@ -103,73 +103,206 @@ class FlaskProtector(ProtectorBase[Union[FlaskApp, Dict[str, Any], List[Any], st
             self.init_app(app)
     
     def _validate_config(self) -> None:
-        """Validate the configuration."""
-        if not isinstance(self.config.get('rate_limit', 60), int):
-            raise ValueError("rate_limit must be an integer")
-            
-        if not isinstance(self.config.get('request_sanitization', True), bool):
-            raise ValueError("request_sanitization must be a boolean")
-            
-        if not isinstance(self.config.get('response_sanitization', True), bool):
-            raise ValueError("response_sanitization must be a boolean")
-            
-        if 'custom_patterns_dir' in self.config and self.config['custom_patterns_dir'] is not None:
-            if not isinstance(self.config['custom_patterns_dir'], str):
-                raise ValueError("custom_patterns_dir must be a string or None")
-            
-        if not isinstance(self.config.get('enable_patterns_api', False), bool):
-            raise ValueError("enable_patterns_api must be a boolean")
-            
-        if not isinstance(self.config.get('patterns_api_prefix', '/api/patterns'), str):
-            raise ValueError("patterns_api_prefix must be a string")
+        """Validate the provided configuration."""
+        if not isinstance(self.config, dict):
+            self.config = {}
+        
+        # Validate required fields
+        if not self.config.get('app') and not self.config.get('model'):
+            logger.warning("Neither 'app' nor 'model' specified in config")
     
     def update_config(self, config: FlaskProtectorConfig) -> None:
-        """
-        Update the configuration with new values.
-        
-        Args:
-            config: New configuration values to update
-        """
+        """Update the component's configuration."""
         self.config.update(config)
         self._validate_config()
-        
-        # Update instance attributes
-        if 'rate_limit' in config:
-            self.rate_limit = config['rate_limit']
-        
-        if 'request_sanitization' in config:
-            self.request_sanitization = config['request_sanitization']
-        
-        if 'response_sanitization' in config:
-            self.response_sanitization = config['response_sanitization']
-        
-        if 'model' in config:
-            self.protector = OpenAIProtector(config={'model': config['model']})
-        
-        if 'custom_patterns_dir' in config:
-            self.custom_patterns_dir = config['custom_patterns_dir']
-        
-        if 'enable_patterns_api' in config:
-            self.enable_patterns_api = config['enable_patterns_api']
-        
-        if 'patterns_api_prefix' in config:
-            self.patterns_api_prefix = config['patterns_api_prefix']
-        
-        if 'patterns_api_auth' in config:
-            self.patterns_api_auth = config['patterns_api_auth']
-        
-        # Update components based on new config
-        self.pattern_provider = self.config.get(
-            'pattern_provider', 
-            FileSystemPatternProvider(config=self.config.get('pattern_provider_config'))
-        )
-        self.word_list_filter = self.config.get(
-            'word_list_filter', 
-            RESK_WordListFilter(config={'pattern_provider': self.pattern_provider, **self.config.get('word_list_filter_config', {})})
-        )
-        
-        self.exempt_routes = set(self.config.get('exempt_routes', []))
     
+    def create_blueprint(self, name: str = 'security', url_prefix: str = '/security') -> Blueprint:
+        """
+        Create a Flask blueprint for security endpoints.
+        
+        Args:
+            name: Blueprint name
+            url_prefix: URL prefix for blueprint routes
+            
+        Returns:
+            Flask blueprint with security endpoints
+        """
+        blueprint = Blueprint(name, __name__, url_prefix=url_prefix)
+        
+        @blueprint.route('/health', methods=['GET'])
+        def health_check():
+            return jsonify({'status': 'healthy', 'service': 'flask_security'})
+        
+        @blueprint.route('/validate', methods=['POST'])
+        def validate_content():
+            data = request.get_json()
+            if not data or 'content' not in data:
+                return jsonify({'error': 'Content field required'}), 400
+            
+            content = data['content']
+            is_valid = self.validate_request_content(content)
+            
+            return jsonify({
+                'valid': is_valid,
+                'content': content
+            })
+        
+        return blueprint
+    
+    def validate_request(self, request_data: Any) -> Dict[str, Any]:
+        """
+        Validate request data for security issues.
+        
+        Args:
+            request_data: Request data to validate
+            
+        Returns:
+            Dictionary with validation results
+        """
+        result = {
+            'valid': True,
+            'issues': [],
+            'blocked': False
+        }
+        
+        try:
+            if isinstance(request_data, str):
+                is_valid = self.validate_request_content(request_data)
+                if not is_valid:
+                    result['valid'] = False
+                    result['issues'].append("Content validation failed")
+                    result['blocked'] = True
+            elif isinstance(request_data, dict):
+                is_valid = self._validate_dict_content(request_data)
+                if not is_valid:
+                    result['valid'] = False
+                    result['issues'].append("Dictionary content validation failed")
+                    result['blocked'] = True
+            elif isinstance(request_data, list):
+                is_valid = self._validate_list_content(request_data)
+                if not is_valid:
+                    result['valid'] = False
+                    result['issues'].append("List content validation failed")
+                    result['blocked'] = True
+        except Exception as e:
+            logger.error(f"Error validating request: {e}")
+            result['valid'] = False
+            result['issues'].append("Request validation error")
+            result['blocked'] = True
+        
+        return result
+    
+    def validate_response(self, response_data: Any) -> Dict[str, Any]:
+        """
+        Validate response data for security issues.
+        
+        Args:
+            response_data: Response data to validate
+            
+        Returns:
+            Dictionary with validation results
+        """
+        result = {
+            'valid': True,
+            'issues': [],
+            'modified': False
+        }
+        
+        try:
+            if isinstance(response_data, str):
+                is_valid = self.validate_response_content(response_data)
+                if not is_valid:
+                    result['valid'] = False
+                    result['issues'].append("Response content validation failed")
+                    result['modified'] = True
+            elif isinstance(response_data, dict):
+                is_valid = self._validate_dict_content(response_data)
+                if not is_valid:
+                    result['valid'] = False
+                    result['issues'].append("Dictionary content validation failed")
+                    result['modified'] = True
+            elif isinstance(response_data, list):
+                is_valid = self._validate_list_content(response_data)
+                if not is_valid:
+                    result['valid'] = False
+                    result['issues'].append("List content validation failed")
+                    result['modified'] = True
+        except Exception as e:
+            logger.error(f"Error validating response: {e}")
+            result['valid'] = False
+            result['issues'].append("Response validation error")
+        
+        return result
+    
+    def validate_request_content(self, content: str) -> bool:
+        """
+        Validate request content for security issues.
+        
+        Args:
+            content: Content string to validate
+            
+        Returns:
+            True if content is valid, False otherwise
+        """
+        # Check for injection attempts
+        if check_text_for_injections(content):
+            return False
+        
+        # Check for PII
+        if check_pii_content(content):
+            return False
+        
+        # Check for toxic content
+        if moderate_text(content):
+            return False
+        
+        return True
+    
+    def validate_response_content(self, content: str) -> bool:
+        """
+        Validate response content for security issues.
+        
+        Args:
+            content: Content string to validate
+            
+        Returns:
+            True if content is valid, False otherwise
+        """
+        # Check for PII in response
+        if check_pii_content(content):
+            logger.warning("PII detected in response")
+            return False
+        
+        return True
+    
+    def _validate_dict_content(self, data: Dict[str, Any]) -> bool:
+        """Validate dictionary content recursively."""
+        for key, value in data.items():
+            if isinstance(value, str):
+                if not self.validate_request_content(value):
+                    return False
+            elif isinstance(value, dict):
+                if not self._validate_dict_content(value):
+                    return False
+            elif isinstance(value, list):
+                if not self._validate_list_content(value):
+                    return False
+        return True
+    
+    def _validate_list_content(self, data: List[Any]) -> bool:
+        """Validate list content recursively."""
+        for item in data:
+            if isinstance(item, str):
+                if not self.validate_request_content(item):
+                    return False
+            elif isinstance(item, dict):
+                if not self._validate_dict_content(item):
+                    return False
+            elif isinstance(item, list):
+                if not self._validate_list_content(item):
+                    return False
+        return True
+
     def protect(self, data: Union[FlaskApp, Dict[str, Any], List[Any], str]) -> Union[FlaskApp, Dict[str, Any], List[Any], str]:
         """
         Main protection method required by ProtectorBase.

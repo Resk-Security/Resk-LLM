@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, Generic, TypeVar, cast
+from dataclasses import dataclass, field
 
 # Generic type for configuration dictionaries
 ConfigType = TypeVar("ConfigType", bound=Dict[str, Any])
@@ -10,6 +11,25 @@ InputType = TypeVar("InputType")
 # Generic type for output data (e.g., processed text, security report)
 OutputType = TypeVar("OutputType")
 
+@dataclass
+class FilterResult:
+    """Result object for filter operations."""
+    is_safe: bool
+    confidence: float
+    reason: Optional[str] = None
+    violations: list = field(default_factory=list)
+    matched_words: list = field(default_factory=list)
+    data: Any = None
+
+@dataclass
+class DetectionResult:
+    """Result object for detection operations."""
+    is_detected: bool
+    confidence: float
+    detected_items: list = field(default_factory=list)
+    reason: Optional[str] = None
+    data: Any = None
+
 class SecurityComponent(ABC, Generic[ConfigType]):
     """
     Base class for all security components in RESK-LLM.
@@ -17,8 +37,10 @@ class SecurityComponent(ABC, Generic[ConfigType]):
     """
     config: ConfigType  # Add type annotation for instance variable
 
-    def __init__(self, config: Optional[ConfigType] = None):
+    def __init__(self, config: Optional[ConfigType] = None, name: str = "unnamed", enabled: bool = True):
         self.config = config if config is not None else cast(ConfigType, {})
+        self.name = name
+        self.enabled = enabled
         self._validate_config()
 
     @abstractmethod
@@ -30,6 +52,26 @@ class SecurityComponent(ABC, Generic[ConfigType]):
     def update_config(self, config: ConfigType) -> None:
         """Update the component's configuration."""
         pass
+    
+    def enable(self) -> None:
+        """Enable the security component."""
+        self.enabled = True
+    
+    def disable(self) -> None:
+        """Disable the security component."""
+        self.enabled = False
+
+# Concrete implementation for testing
+class ConcreteSecurityComponent(SecurityComponent[Dict[str, Any]]):
+    """Concrete implementation of SecurityComponent for testing."""
+    
+    def _validate_config(self) -> None:
+        """Validate the provided configuration."""
+        pass
+    
+    def update_config(self, config: Dict[str, Any]) -> None:
+        """Update the component's configuration."""
+        self.config.update(config)
 
 class FilterBase(SecurityComponent[ConfigType], Generic[InputType, OutputType, ConfigType]):
     """

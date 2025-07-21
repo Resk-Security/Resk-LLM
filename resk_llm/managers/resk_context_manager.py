@@ -50,20 +50,12 @@ class RESK_TextCleaner:
             return f'```\n{content}```'
         return re.sub(code_block_pattern, fix_code_block, text, flags=re.DOTALL)
 
-class RESK_ContextManagerConfig(TypedDict, total=False):
-    model_info: Dict[str, Union[int, str]]
-    preserved_prompts: int
-    reserved_tokens: int
-    compression_enabled: bool
-    max_messages: int
-    smart_pruning: bool
-
-class RESK_ContextManager(SecurityComponent[RESK_ContextManagerConfig]):
+class RESK_ContextManager(SecurityComponent[Dict[str, Any]]):
     """
     Base class for context managers (RESK).
     """
     def __init__(self, model_info: Dict[str, Union[int, str]], preserved_prompts: int = 2):
-        config: RESK_ContextManagerConfig = {
+        config: Dict[str, Any] = {
             "model_info": model_info,
             "preserved_prompts": preserved_prompts
         }
@@ -81,7 +73,7 @@ class RESK_ContextManager(SecurityComponent[RESK_ContextManagerConfig]):
         if "context_window" not in model_info:
             raise ValueError("context_window is required in model_info")
 
-    def update_config(self, config: RESK_ContextManagerConfig) -> None:
+    def update_config(self, config: Dict[str, Any]) -> None:
         self.config.update(config)
         self._validate_config()
         if "model_info" in config:
@@ -157,7 +149,7 @@ class RESK_TokenBasedContextManager(RESK_ContextManager):
         if "compression_enabled" in self.config and not isinstance(self.config["compression_enabled"], bool):
             raise ValueError("compression_enabled must be a boolean")
 
-    def update_config(self, config: RESK_ContextManagerConfig) -> None:
+    def update_config(self, config: Dict[str, Any]) -> None:
         super().update_config(config)
         if "reserved_tokens" in config:
             self.reserved_tokens = config["reserved_tokens"]
@@ -285,7 +277,7 @@ class RESK_MessageBasedContextManager(RESK_ContextManager):
         if "smart_pruning" in self.config and not isinstance(self.config["smart_pruning"], bool):
             raise ValueError("smart_pruning must be a boolean")
 
-    def update_config(self, config: RESK_ContextManagerConfig) -> None:
+    def update_config(self, config: Dict[str, Any]) -> None:
         super().update_config(config)
         if "max_messages" in config:
             self.max_messages = config["max_messages"]

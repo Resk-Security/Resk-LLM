@@ -3,19 +3,16 @@
 
 import logging
 import re # Import re for word boundary checks
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Optional, Set, Tuple, Any, Union
+from dataclasses import dataclass, field
 
 # Import RESK-LLM core components
-from resk_llm.core.abc import FilterBase, PatternProviderBase # Import PatternProviderBase
+from resk_llm.core.abc import FilterBase, FilterResult
 # Explicitly import the concrete provider we expect for now
 from resk_llm.patterns.pattern_provider import FileSystemPatternProvider
 
 # Define config type
 WordListFilterConfig = Dict[str, Any]
-
-# Define filter output type
-# (passed_filter, reason, original_text) - similar to HeuristicFilter
-FilterResult = Tuple[bool, Optional[str], str]
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +22,7 @@ class RESK_WordListFilter(FilterBase[str, FilterResult, WordListFilterConfig]):
     It retrieves these keywords from a configured PatternProvider.
     """
 
-    def __init__(self, config: Optional[WordListFilterConfig] = None):
+    def __init__(self, config: Optional[WordListFilterConfig] = None, word_lists: Optional[Dict[str, List[str]]] = None, case_sensitive: bool = False):
         """
         Initializes the WordListFilter.
 
@@ -35,39 +32,95 @@ class RESK_WordListFilter(FilterBase[str, FilterResult, WordListFilterConfig]):
                 'keyword_sources': Optional list of source names (categories) to fetch keywords from the provider.
                                    If None, uses all available keyword sources from the provider.
                 'case_sensitive': Boolean (default False) for keyword matching.
+                'word_lists': Optional dictionary of word lists to use directly.
+            word_lists: Direct word lists parameter (for backward compatibility)
+            case_sensitive: Direct case_sensitive parameter (for backward compatibility)
         """
         self.pattern_provider: Optional[FileSystemPatternProvider] = None
         self.prohibited_words: Set[str] = set()
         self.keyword_sources: Optional[List[str]] = None
-        self.case_sensitive: bool = False
+        self.case_sensitive: bool = case_sensitive
+        self.enabled: bool = True  # Add enabled attribute
+        self.word_lists: Dict[str, List[str]] = {}  # Add word_lists attribute
         self.logger = logger
+        
+        # Handle word_lists parameter (both from config and direct parameter)
+        if word_lists:
+            self.word_lists = word_lists
+            # Convert word lists to prohibited words
+            for word_list in self.word_lists.values():
+                if isinstance(word_list, list):
+                    self.prohibited_words.update(word_list)
+        elif config and 'word_lists' in config:
+            self.word_lists = config['word_lists']
+            # Convert word lists to prohibited words
+            for word_list in self.word_lists.values():
+                if isinstance(word_list, list):
+                    self.prohibited_words.update(word_list)
+        
+        # Handle case_sensitive parameter
+        if config and 'case_sensitive' in config:
+            self.case_sensitive = config['case_sensitive']
+        
         super().__init__(config) # Calls _validate_config
 
     def _validate_config(self) -> None:
-        """Validate configuration and load keywords from the provider."""
+        """
+        Validate the configuration.
+        
+        Note: Pattern provider is optional for backward compatibility.
+        """
         if not isinstance(self.config, dict):
             self.config = {}
-
-        provider = self.config.get('pattern_provider')
-        # Check if it's an instance of the ABC
-        if not isinstance(provider, FileSystemPatternProvider):
-            self.logger.error("WordListFilter requires a valid 'pattern_provider' (instance of FileSystemPatternProvider) in its config.")
-            # Set provider to None, filter will be ineffective but won't crash
-            self.pattern_provider = None
-            self.prohibited_words = set()
-            return # Cannot proceed without a provider
+        
+        # Initialize prohibited words and patterns
+        self.prohibited_words = set()
+        self.prohibited_patterns = []
+        
+        # Handle word_lists parameter (both from config and direct parameter)
+        if hasattr(self, 'word_lists') and self.word_lists:
+            # Convert word lists to prohibited words
+            for word_list in self.word_lists.values():
+                if isinstance(word_list, list):
+                    self.prohibited_words.update(word_list)
+        elif self.config and 'word_lists' in self.config:
+            self.word_lists = self.config['word_lists']
+            # Convert word lists to prohibited words
+            for word_list in self.word_lists.values():
+                if isinstance(word_list, list):
+                    self.prohibited_words.update(word_list)
+        
+        # Handle pattern provider if available
+        if self.config and 'pattern_provider' in self.config:
+            provider = self.config['pattern_provider']
+            if isinstance(provider, FileSystemPatternProvider):
+                self.pattern_provider = provider
+                # Load patterns and words from provider
+                self.prohibited_patterns = [re.compile(p, re.IGNORECASE) for p in self.pattern_provider.get_patterns(category='prohibited_patterns')]
+                additional_words = set(self.pattern_provider.get_keywords(sources=['prohibited_words']))
+                self.prohibited_words.update(additional_words)
+            else:
+                self.logger.warning("Pattern provider is not a FileSystemPatternProvider instance")
         else:
-            self.pattern_provider = provider
-
-        self.keyword_sources = self.config.get('keyword_sources')
-        if self.keyword_sources is not None and not isinstance(self.keyword_sources, list):
-             self.logger.warning("'keyword_sources' should be a list of strings. Ignoring.")
-             self.keyword_sources = None
-
-        self.case_sensitive = self.config.get('case_sensitive', False)
-
-        # Load keywords
-        self._load_keywords()
+            # Fallback: load from config (previous behavior)
+            patterns = self.config.get('prohibited_patterns', [])
+            if isinstance(patterns, list):
+                for pattern in patterns:
+                    try:
+                        self.prohibited_patterns.append(re.compile(pattern, re.IGNORECASE))
+                    except re.error:
+                        pass
+            
+            words = self.config.get('prohibited_words', [])
+            if isinstance(words, list):
+                self.prohibited_words.update(words)
+        
+        # Load keyword sources if specified
+        if self.config and 'keyword_sources' in self.config:
+            self.keyword_sources = self.config['keyword_sources']
+            if self.pattern_provider and self.keyword_sources:
+                additional_words = set(self.pattern_provider.get_keywords(sources=self.keyword_sources))
+                self.prohibited_words.update(additional_words)
 
     def _load_keywords(self) -> None:
         """Load (or reload) keywords from the configured pattern provider."""
@@ -95,48 +148,118 @@ class RESK_WordListFilter(FilterBase[str, FilterResult, WordListFilterConfig]):
         """Update filter configuration and reload keywords."""
         self.config.update(config)
         self._validate_config() # Re-validates and reloads keywords
+    
+    def enable(self) -> None:
+        """Enable the filter."""
+        self.enabled = True
+    
+    def disable(self) -> None:
+        """Disable the filter."""
+        self.enabled = False
+    
+    def add_words(self, category: str, words: Union[str, List[str]]) -> None:
+        """
+        Add words to the filter.
+        
+        Args:
+            category: Category of words (default: "prohibited")
+            words: Word or list of words to add
+        """
+        if isinstance(words, str):
+            self.logger.warning("add_words expects a list of strings, got string. Treating as single word.")
+            self.prohibited_words.add(words)
+        elif isinstance(words, list):
+            self.prohibited_words.update(words)
+        else:
+            self.logger.warning("add_words expects a list of strings")
+        
+        # Update word_lists if it exists
+        if hasattr(self, 'word_lists') and isinstance(self.word_lists, dict):
+            if category not in self.word_lists:
+                self.word_lists[category] = []
+            if isinstance(words, str):
+                self.word_lists[category].append(words)
+            elif isinstance(words, list):
+                self.word_lists[category].extend(words)
+    
+    def remove_words(self, category: str, words: List[str]) -> None:
+        """
+        Remove words from the filter.
+        
+        Args:
+            category: Category of words (default: "prohibited")
+            words: List of words to remove
+        """
+        if isinstance(words, list):
+            for word in words:
+                self.prohibited_words.discard(word)
+        else:
+            self.logger.warning("remove_words expects a list of strings")
+        
+        # Update word_lists if it exists
+        if hasattr(self, 'word_lists') and isinstance(self.word_lists, dict):
+            if category in self.word_lists and isinstance(self.word_lists[category], list):
+                for word in words:
+                    if word in self.word_lists[category]:
+                        self.word_lists[category].remove(word)
 
     def filter(self, data: str) -> FilterResult:
         """
-        Apply the word list filter to the input text.
-
+        Filter text against prohibited words.
+        
         Args:
-            data: The input string to be filtered.
-
+            data: Text to filter
+            
         Returns:
-            A tuple (passed_filter, reason, filtered_text) where:
-            - passed_filter (bool): True if the text passed (no prohibited words found), False otherwise.
-            - reason (Optional[str]): Explanation ("Prohibited word detected: 'word'") if failed, None otherwise.
-            - filtered_text (str): The original input text. This filter doesn't modify text.
+            FilterResult with filtering results
         """
-        if not isinstance(data, str):
-            self.logger.debug("WordListFilter received non-string data, passing through.")
-            return True, None, data
-
-        if not self.prohibited_words:
-            # Pass if no words loaded (e.g., provider error or empty lists)
-            self.logger.debug("WordListFilter has no prohibited words loaded, passing through.")
-            return True, None, data
-
-        # Simple substring check might be too broad (e.g., 'ass' in 'class').
-        # Use word boundary checks for more accuracy.
+        if not self.enabled:
+            return FilterResult(is_safe=True, confidence=1.0, violations=[], matched_words=[], data=data)
+        
+        violations = []
+        found_words = []
+        
+        # Check against prohibited words
         for word in self.prohibited_words:
-            # Escape potential regex characters in the word itself
-            escaped_word = re.escape(word)
-            # Compile pattern with word boundaries
-            try:
-                 # Case sensitivity handled by flags
-                 flags = 0 if self.case_sensitive else re.IGNORECASE
-                 pattern = re.compile(r'\b' + escaped_word + r'\b', flags)
-                 match = pattern.search(data) # Search original data
-                 if match:
-                      matched_text = match.group(0) # The actual matched word from input
-                      self.logger.warning(f"WordListFilter triggered: Prohibited word '{matched_text}' (pattern: {word}) found.")
-                      return False, f"Prohibited word detected: '{matched_text}'", data
-            except re.error as e:
-                 # This should ideally not happen if words are simple strings, but handle defensively
-                 self.logger.error(f"Regex error checking word '{word}': {e}")
-                 continue # Skip this word if problematic
+            if self.case_sensitive:
+                if word in data:
+                    found_words.append(word)
+            else:
+                # Case insensitive search - check both original and lowercase versions
+                if word.lower() in data.lower():
+                    # Find the actual matched word in the original text
+                    import re
+                    pattern = re.compile(re.escape(word), re.IGNORECASE)
+                    matches = pattern.findall(data)
+                    found_words.extend(matches)
+        
+        if found_words:
+            violations = [f"Prohibited word found: {word}" for word in found_words]
+        
+        is_safe = len(violations) == 0
+        confidence = 0.9 if is_safe else 0.6
+        
+        return FilterResult(
+            is_safe=is_safe,
+            confidence=confidence,
+            reason="Prohibited words detected" if violations else None,
+            violations=violations,
+            matched_words=found_words,
+            data=data
+        )
+    
+    def process(self, data: str) -> FilterResult:
+        return self.filter(data)
 
-        # Passed all checks
-        return True, None, data 
+    def check_input(self, text: str) -> Optional[str]:
+        """
+        Check input text for forbidden words.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            Warning message if forbidden words are found, None otherwise
+        """
+        passed, reason, _ = self.filter(text)
+        return reason if not passed else None 

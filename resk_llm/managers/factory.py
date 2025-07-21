@@ -36,81 +36,22 @@ def create_heuristic_filter(
     Create a configured HeuristicFilter instance.
     
     Args:
-        suspicious_keywords: Additional keywords to include
-        suspicious_patterns: Additional regex patterns to include
+        suspicious_keywords: Additional suspicious keywords to detect
+        suspicious_patterns: Additional suspicious patterns to detect
         use_defaults: Whether to use default patterns and keywords
     
     Returns:
         Configured HeuristicFilter instance
     """
-    # Initialize the config dictionary expected by HeuristicFilter
-    # HeuristicFilter handles 'use_defaults' internally from the config dict.
-    config: Dict[str, Union[Set[str], List[str], bool]] = {
-        'use_defaults': use_defaults, # Pass use_defaults here for HeuristicFilter._validate_config
-        'suspicious_keywords': set(),
-        'suspicious_patterns': []
-    }
+    config: Dict[str, Any] = {'use_defaults': use_defaults}
     
     if suspicious_keywords:
         config['suspicious_keywords'] = suspicious_keywords
     
     if suspicious_patterns:
         config['suspicious_patterns'] = suspicious_patterns
-    
-    # Filter out 'use_defaults' before passing if HeuristicFilter.__init__ strictly expects only pattern lists/sets.
-    # Based on HeuristicFilter.__init__(self, config=...) and _validate_config(self): 
-    # It seems __init__ takes the config dict including 'use_defaults', and _validate_config reads it.
-    # So, the previous structure might be okay, but the type hint was wrong. Let's refine.
-    
-    # Correct config structure based on HeuristicFilter._validate_config which reads from self.config
-    heuristic_config: Dict[str, Any] = {
-        'use_defaults': use_defaults
-    }
-    if suspicious_keywords:
-        heuristic_config['suspicious_keywords'] = suspicious_keywords
-    if suspicious_patterns:
-        heuristic_config['suspicious_patterns'] = suspicious_patterns
         
-    # The error was: Argument "config" to "HeuristicFilter" has incompatible type 
-    # "dict[str, bool | set[str] | list[str]]"; expected "dict[str, list[str] | set[str]] | None"
-    # This implies the __init__ type hint for config might be incorrect/too strict, or 
-    # 'use_defaults' should not be in the config passed to __init__.
-    # Let's assume 'use_defaults' should not be in the dict passed to __init__ based on the error.
-    
-    init_config: RESK_HeuristicFilter.Config = {}
-    if suspicious_keywords:
-        init_config['suspicious_keywords'] = suspicious_keywords
-    if suspicious_patterns:
-        init_config['suspicious_patterns'] = suspicious_patterns
-        
-    # How to pass use_defaults then? Maybe it's not configurable via factory?
-    # Let's re-read HeuristicFilter.__init__ and _validate_config.
-    # __init__(self, config: Optional[HeuristicFilterConfig] = None):
-    # _validate_config(self): self.config.get('use_defaults', True)
-    # HeuristicFilterConfig = Dict[str, Union[List[str], Set[str]]] # This is the type hint for config in __init__
-    
-    # This confirms the error message: the config dict passed to __init__ should only contain list[str] or set[str].
-    # The 'use_defaults' logic seems internal and not configurable via the init `config` dict.
-    # The factory should probably not try to set 'use_defaults'. The filter defaults to True.
-    # If the user wants use_defaults=False, they'd need to configure the filter differently.
-    # Let's simplify the factory to only pass keywords/patterns.
-    
-    final_config: RESK_HeuristicFilter.Config = {}
-    if suspicious_keywords:
-        final_config['suspicious_keywords'] = suspicious_keywords
-    if suspicious_patterns:
-        final_config['suspicious_patterns'] = suspicious_patterns
-        
-    # If use_defaults=False is passed to the factory, we cannot directly configure the filter
-    # instance with this parameter via its __init__ config dict.
-    # We could instantiate and then call update_config, but that's clumsy.
-    # Let's assume the factory user understands that use_defaults=True is the filter's default.
-    # If they provide keywords/patterns, they will be *added* to the defaults.
-    # To use *only* provided lists, they would need use_defaults=False, which this factory
-    # cannot directly set via the constructor config based on the type hints.
-    # Maybe HeuristicFilter.__init__ should accept use_defaults? Let's assume current state.
-
-    return RESK_HeuristicFilter(config=final_config if final_config else None)
+    return RESK_HeuristicFilter(config=config)
 
 def create_text_analyzer(
     additional_homoglyphs: Optional[Dict[str, List[str]]] = None,

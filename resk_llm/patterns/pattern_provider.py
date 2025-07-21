@@ -18,9 +18,9 @@ from resk_llm.core.abc import SecurityComponent, PatternProviderBase
 
 # Import default patterns/lists
 try:
-    from resk_llm.filtering_patterns.prohibited_words import RESK_WORDS_LIST
-    from resk_llm.filtering_patterns.prohibited_patterns_eng import RESK_PROHIBITED_PATTERNS_ENG
-    from resk_llm.filtering_patterns.prohibited_patterns_fr import RESK_PROHIBITED_PATTERNS_FR
+    from resk_llm.patterns.prohibited_words import RESK_WORDS_LIST
+    from resk_llm.patterns.prohibited_patterns_eng import RESK_PROHIBITED_PATTERNS_ENG
+    from resk_llm.patterns.prohibited_patterns_fr import RESK_PROHIBITED_PATTERNS_FR
     DEFAULTS_AVAILABLE = True
 except ImportError:
     # Initialize as empty list to match expected type
@@ -29,7 +29,7 @@ except ImportError:
     RESK_PROHIBITED_PATTERNS_ENG = list() # type: ignore[assignment]
     RESK_PROHIBITED_PATTERNS_FR = list() # type: ignore[assignment]
     DEFAULTS_AVAILABLE = False
-    logging.warning("Could not import default pattern lists from resk_llm.filtering_patterns.")
+    logging.warning("Could not import default pattern lists from resk_llm.patterns.")
 
 # Setup logger for this module
 logger = logging.getLogger(__name__)

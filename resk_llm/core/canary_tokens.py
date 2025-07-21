@@ -99,16 +99,30 @@ class CanaryTokenManager(SecurityComponent[Dict[str, Any]]):
         # Create a unique ID for this token instance
         token_id = hashlib.md5(token.encode()).hexdigest()
         
-        # Register the token with context and timestamp
+        # Register the token
         self.active_tokens[token_id] = {
             'token': token,
-            'created_at': datetime.now().isoformat(),
-            'context': context_info or {},
+            'created_at': datetime.now(),
+            'context_info': context_info or {},
             'is_active': True
         }
         
         self.tokens_generated += 1
+        self.logger.debug(f"Generated canary token: {token_id}")
+        
         return token
+    
+    def create_token(self, context_info: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Create a new canary token (alias for generate_token).
+        
+        Args:
+            context_info: Optional context information about where the token is used
+            
+        Returns:
+            The generated token string
+        """
+        return self.generate_token(context_info)
     
     def insert_canary_token(self, text: str, context_info: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
         """
@@ -150,18 +164,22 @@ class CanaryTokenManager(SecurityComponent[Dict[str, Any]]):
     
     def check_for_leaks(self, text: str) -> Tuple[bool, List[Dict[str, Any]]]:
         """
-        Check if any active canary tokens appear in the given text.
+        Check text for leaked canary tokens.
         
         Args:
-            text: The text to check for leaked tokens
+            text: Text to check for leaked tokens
             
         Returns:
-            Tuple of (tokens_found, leak_details)
+            Tuple of (tokens_found, leaked_tokens_list)
         """
-        leaked_tokens = []
         tokens_found = False
+        leaked_tokens = []
         
+        # Check all active tokens
         for token_id, token_data in self.active_tokens.items():
+            if not token_data.get('is_active', True):
+                continue
+            
             token = token_data['token']
             
             # Check if the token appears in the text
@@ -172,23 +190,25 @@ class CanaryTokenManager(SecurityComponent[Dict[str, Any]]):
                 # Record the leak
                 leak_id = f"{token_id}_{int(leak_time.timestamp())}"
                 leak_info = {
-                    'token_id': token_id,
                     'token': token,
                     'leaked_at': leak_time.isoformat(),
-                    'context': token_data['context'],
-                    'time_to_leak': (leak_time - datetime.fromisoformat(token_data['created_at'])).total_seconds(),
+                    'context': token_data['context_info'],
+                    'time_to_leak': (leak_time - token_data['created_at']).total_seconds(),
                     'leak_id': leak_id
                 }
                 
-                # Store the leak information
+                # Store in both the manager's leak record and return list
                 self.leaked_tokens[leak_id] = leak_info
                 leaked_tokens.append(leak_info)
                 
                 # Update metrics
                 self.tokens_leaked += 1
                 
+                # Mark token as inactive
+                token_data['is_active'] = False
+                
                 # Log the leak
-                self.logger.warning(f"Canary token leak detected! Token: {token}, Context: {token_data['context']}")
+                self.logger.warning(f"Canary token leak detected! Token: {token}, Context: {token_data['context_info']}")
         
         return tokens_found, leaked_tokens
     
