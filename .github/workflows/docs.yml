@@ -9,7 +9,7 @@ on:
       - '*.py'
       - 'requirements.txt'
       - 'pyproject.toml'
-      - 'setup.py'
+      - 'majsetup.py'
       - '.readthedocs.yml'
     tags: [ 'v*' ]
   pull_request:
@@ -85,6 +85,5 @@ jobs:
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs/_build/html
-        force_orphan: true 
+        github_token: ${{ secrets.GH_PAT }}
+        publish_dir: ./public 
