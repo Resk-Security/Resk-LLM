@@ -3,7 +3,6 @@ name: Build and Deploy Documentation
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
     paths:
       - 'docs/**'
       - 'resk_llm/**'
@@ -12,6 +11,7 @@ on:
       - 'pyproject.toml'
       - 'setup.py'
       - '.readthedocs.yml'
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
     paths:
