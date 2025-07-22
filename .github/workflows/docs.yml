@@ -1,6 +1,6 @@
 name: Build and Deploy Documentation
 
-on:  
+on:
   push:
     branches: [ main ]
     paths:
@@ -22,6 +22,15 @@ on:
       - 'pyproject.toml'
       - 'setup.py'
       - '.readthedocs.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "docs"
+  cancel-in-progress: false
 
 jobs:
   build-docs:
@@ -64,28 +73,31 @@ jobs:
         mkdir -p ../public
         cp -r _build/html/* ../public/
     
-    - name: Upload docs artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: documentation
-        path: public/
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
     
-  deploy-docs:
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './public'
+    
+    - name: Trigger ReadTheDocs build
+      if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      run: |
+        curl -X POST https://app.readthedocs.org/api/v2/webhook/resk-llm/305016/ \
+          -H "Content-Type: application/json" \
+          -d '{"repository": "${{ github.repository }}", "branch": "${{ github.ref_name }}", "commit": "${{ github.sha }}"}'
+    
+  deploy-pages:
     needs: build-docs
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
     
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download docs artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: documentation
-        path: public/
-    
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GH_PAT }}
-        publish_dir: ./public 
+      id: deployment
+      uses: actions/deploy-pages@v4 
