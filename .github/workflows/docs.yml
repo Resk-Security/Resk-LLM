@@ -85,7 +85,7 @@ jobs:
     - name: Trigger Read the Docs build (v3 API)
       if: startsWith(github.ref, 'refs/tags/v')
       env:
-        RTD_TOKEN: ${{ secrets.READTHEDOCS_TOKEN }}
+        RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
         RTD_PROJECT: resk-llm
       run: |
         if [ -z "${RTD_TOKEN}" ]; then
