@@ -177,3 +177,4 @@ uv.lock
 .codeql-db/
 .codeql-results.csv
 .codeql-results.sarif
+mypy.ini
