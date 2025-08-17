@@ -17,8 +17,6 @@ RESK-LLM is a robust Python library designed to enhance security and manage cont
 
 RESK-LLM is a comprehensive security toolkit for Large Language Models (LLMs), designed to protect against prompt injections, data leakage, and malicious use. It provides robust security features for multiple LLM providers including OpenAI, Anthropic, Cohere, DeepSeek, and OpenRouter.
 
-### ReadTheDocs : https://resk.readthedocs.io/en/latest/index.html
-
 ## Features
     
 - 🛡️ **Prompt Injection Protection**: Defends against attempts to manipulate model behavior through carefully crafted prompts
