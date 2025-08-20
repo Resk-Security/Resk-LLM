@@ -1,4 +1,4 @@
-name: Build and Deploy Documentation
+name: Documentation Build Check
 
 on:
   push:
@@ -29,8 +29,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: "docs"
@@ -43,7 +41,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Important for version detection
+        fetch-depth: 0
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -65,26 +63,9 @@ jobs:
     
     - name: Build documentation (MkDocs)
       run: |
-        mkdocs build --strict --site-dir public
+        mkdocs build --strict
     
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-    
-    - name: Upload Pages artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: './public'
-    
-  deploy-pages:
-    needs: build-docs
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    
-    steps:
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4 
+    - name: Check documentation build
+      run: |
+        echo "✅ Documentation built successfully"
+        echo "📖 ReadTheDocs will automatically build and deploy from .readthedocs.yaml" 
