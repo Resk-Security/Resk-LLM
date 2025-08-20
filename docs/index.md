@@ -1,66 +1,32 @@
-# Welcome to RESK-LLM's documentation!
+---
+title: RESK-LLM
+---
 
-```{include} ../README.md
-:relative-docs: docs/
-:relative-images:
-```
+# RESK-LLM: Robust Security for LLM Applications
 
-## Quick Start
+RESK-LLM is a security toolkit for Large Language Models (LLMs). It protects against prompt injections, PII leakage, malicious URLs, and more. It offers filters, detectors, context managers, vector similarity checks, and integrations with popular frameworks.
 
-```{toctree}
-:maxdepth: 2
-:caption: Getting Started:
+- Getting started: installation and a minimal example
+- Modules: how to use filters, detectors, managers, utilities, patterns
+- Cheat sheet: quick commands and common snippets
 
-quickstart
-installation
-examples/index
-```
+Useful links:
 
-## User Guide
+- PyPI: resk-llm
+- GitHub: Resk-LLM
 
-```{toctree}
-:maxdepth: 2
-:caption: User Guide:
-
-user_guide/overview
-user_guide/configuration
-user_guide/security_features
-user_guide/integrations
-```
-
-## API Reference
+## Modules
 
 ```{toctree}
 :maxdepth: 2
-:caption: API Documentation:
+:caption: API & Guides
 
-autoapi/index
+modules/overview
+modules/filters
+modules/detectors
+modules/managers
+modules/integrations
+modules/patterns
+modules/utilities
+modules/models
 ```
-
-## Examples
-
-```{toctree}
-:maxdepth: 2
-:caption: Examples:
-
-examples/simple_example
-examples/fastapi_example
-examples/huggingface_example
-examples/security_example
-```
-
-## Development
-
-```{toctree}
-:maxdepth: 2
-:caption: Development:
-
-contributing
-changelog
-```
-
-## Indices and tables
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search` 

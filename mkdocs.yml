@@ -1,0 +1,55 @@
+site_name: RESK-LLM Docs
+site_description: Robust security toolkit for LLM applications
+site_url: https://resk-llm.github.io/
+repo_url: https://github.com/Resk-Security/Resk-LLM
+repo_name: Resk-LLM
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - content.code.copy
+    - content.action.edit
+    - toc.integrate
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Modules:
+    - Orchestrator (RESK): modules/resk.md
+    - Filters: modules/filters.md
+    - Detectors: modules/detectors.md
+    - Managers: modules/managers.md
+    - Integrations: modules/integrations.md
+    - Utilities: modules/utilities.md
+    - Patterns: modules/patterns.md
+  - Cheat sheet: cheatsheet.md
+
+markdown_extensions:
+  - admonition
+  - footnotes
+  - toc:
+      permalink: true
+  - codehilite
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Resk-Security/Resk-LLM
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/resk-llm/
+
+plugins:
+  - search
+
