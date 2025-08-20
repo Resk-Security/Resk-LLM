@@ -6,6 +6,7 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - '.readthedocs.yaml'
       - 'resk_llm/**'
       - '*.py'
       - 'requirements.txt'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - '.readthedocs.yaml'
       - 'resk_llm/**'
       - '*.py'
       - 'requirements.txt'
@@ -29,7 +31,6 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  deployments: write
 
 concurrency:
   group: "docs"
@@ -78,10 +79,6 @@ jobs:
     needs: build-docs
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
     - name: Deploy to GitHub Pages

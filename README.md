@@ -19,8 +19,9 @@ RESK-LLM is a comprehensive security toolkit for Large Language Models (LLMs), d
 
 ### Documentation
 
-- MkDocs Material site: https://resk-llm.github.io (local build: `mkdocs serve`)
-- ReadTheDocs (legacy): https://resk.readthedocs.io/en/latest/index.html
+- **GitHub Pages**: https://resk-security.github.io/Resk-LLM/ (MkDocs Material)
+- **ReadTheDocs**: https://resk.readthedocs.io/en/latest/index.html (MkDocs Material)
+- **Local build**: `mkdocs serve`
 
 ## Features
     
