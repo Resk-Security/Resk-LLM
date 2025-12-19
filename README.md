@@ -1,7 +1,5 @@
 # RESK-LLM: Robust Security for LLM Applications
 
-RESK-LLM is a robust Python library designed to enhance security and manage context when interacting with LLM APIs. It provides a protective layer for API calls, safeguarding against common vulnerabilities and ensuring optimal performance.
-
 [![PyPI version](https://img.shields.io/pypi/v/resk-llm.svg)](https://pypi.org/project/resk-llm/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/resk-llm.svg)](https://pypi.org/project/resk-llm/)
 [![License](https://img.shields.io/pypi/l/resk-llm.svg)](https://github.com/Resk-LLM/Resk-LLM/blob/main/LICENSE)
