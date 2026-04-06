@@ -23,10 +23,44 @@ from .protection.sanitizer import InputSanitizer
 from .protection.validator import OutputValidator
 from .protection.canary import CanaryManager
 
-# Integrations
-from .integrations.fastapi import ReskMiddleware
-from .integrations.resk_openai import OpenAIWrapper
-from .integrations.resk_logits import ReskLogitsIntegration
+# Integrations — optional, imported lazily on demand
+_ReskMiddleware = None
+_OpenAIWrapper = None
+_ReskLogitsIntegration = None
+
+def _load_integrations():
+    global _ReskMiddleware, _OpenAIWrapper, _ReskLogitsIntegration
+    if _ReskMiddleware is not None:
+        return
+    try:
+        from .integrations.fastapi import ReskMiddleware as _M
+        _ReskMiddleware = _M
+    except ImportError:
+        pass
+    try:
+        from .integrations.resk_openai import OpenAIWrapper as _O
+        _OpenAIWrapper = _O
+    except ImportError:
+        pass
+    try:
+        from .integrations.resk_logits import ReskLogitsIntegration as _L
+        _ReskLogitsIntegration = _L
+    except ImportError:
+        pass
+
+def __getattr__(name):
+    if name in ("ReskMiddleware", "OpenAIWrapper", "ReskLogitsIntegration"):
+        _load_integrations()
+        if name == "ReskMiddleware" and _ReskMiddleware is not None:
+            return _ReskMiddleware
+        if name == "OpenAIWrapper" and _OpenAIWrapper is not None:
+            return _OpenAIWrapper
+        if name == "ReskLogitsIntegration" and _ReskLogitsIntegration is not None:
+            return _ReskLogitsIntegration
+        raise ImportError(
+            f"{name} requires optional dependencies. Install with: pip install resk-llm[all]"
+        )
+    raise AttributeError(f"module {__name__} has no attribute {name}")
 
 __all__ = [
     "__version__",
@@ -40,6 +74,6 @@ __all__ = [
     "VectorSimilarityDetector", "ACLDecisionTreeDetector", "ContentFramingDetector",
     # Protection
     "InputSanitizer", "OutputValidator", "CanaryManager",
-    # Integrations
+    # Integrations (optional, lazy-loaded)
     "ReskMiddleware", "OpenAIWrapper", "ReskLogitsIntegration",
 ]

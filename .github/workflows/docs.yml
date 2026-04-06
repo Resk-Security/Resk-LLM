@@ -7,11 +7,9 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.readthedocs.yaml'
-      - 'resk_llm/**'
+      - 'resk2/**'
       - '*.py'
-      - 'requirements.txt'
       - 'pyproject.toml'
-      - 'setup.py'
       - '.github/workflows/docs.yml'
     tags: [ 'v*' ]
   pull_request:
@@ -20,11 +18,9 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.readthedocs.yaml'
-      - 'resk_llm/**'
+      - 'resk2/**'
       - '*.py'
-      - 'requirements.txt'
       - 'pyproject.toml'
-      - 'setup.py'
       - '.github/workflows/docs.yml'
 
 permissions:
@@ -44,15 +40,15 @@ jobs:
         fetch-depth: 0
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
     
     - name: Cache pip dependencies
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
     
@@ -67,5 +63,4 @@ jobs:
     
     - name: Check documentation build
       run: |
-        echo "✅ Documentation built successfully"
-        echo "📖 ReadTheDocs will automatically build and deploy from .readthedocs.yaml" 
+        echo "Documentation built successfully"
