@@ -65,8 +65,14 @@ class SecurityPipeline:
         self._detectors = [d for d in self._detectors if d.name != detector_name]
         return len(self._detectors) < before
 
-    def run(self, text: str, **kwargs: Any) -> PipelineResult:
-        """Run all enabled detectors on the input text."""
+    def run(self, text: str, context: "ConversationContext | None" = None, **kwargs: Any) -> PipelineResult:
+        """Run all enabled detectors on the input text.
+
+        Args:
+            text: Input text to scan
+            context: Optional ConversationContext to pass to detectors
+            **kwargs: Extra kwargs forwarded to each detector
+        """
         result = PipelineResult(input_text=text)
         results: list[DetectionResult] = []
 
@@ -74,7 +80,7 @@ class SecurityPipeline:
             if not detector.enabled:
                 continue
             try:
-                det_result = detector.analyze(text, **kwargs)
+                det_result = detector.analyze(text, context=context, **kwargs)
                 results.append(det_result)
             except Exception as e:
                 results.append(DetectionResult(
@@ -102,7 +108,7 @@ class SecurityPipeline:
         result.severity = result.max_severity
         return result
 
-    def run_safe(self, text: str, **kwargs: Any) -> tuple[bool, PipelineResult]:
+    def run_safe(self, text: str, context: "ConversationContext | None" = None, **kwargs: Any) -> tuple[bool, PipelineResult]:
         """Run pipeline and return (is_safe, result) tuple."""
-        result = self.run(text, **kwargs)
+        result = self.run(text, context=context, **kwargs)
         return result.is_safe, result
