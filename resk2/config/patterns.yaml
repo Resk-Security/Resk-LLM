@@ -1,0 +1,375 @@
+# RESK-LLM v2.1 - Security Patterns Configuration
+# User-editable file. All patterns are case-insensitive regex strings.
+# Each detector reads its own section. Set enabled: false to disable a category.
+
+global:
+  languages: [en, fr]
+  min_confidence: 0.3
+  max_input_length: 100000
+
+# =====================================================================
+# DIRECT INJECTION PATTERNS
+# =====================================================================
+direct_injection:
+  enabled: true
+
+  high:
+    - name: ignore_previous_en
+      pattern: '(?:ignore|forget|disregard|neglect|overrid)\s*(?:(?:all\s+(?:previous\s+|prior\s+)?|any\s+|previous\s+|prior\s+|the\s+)?)?(?:instructions?|commands?|prompts?|rules?|guidelines?|directives?|constraints?|system\s*message|filters?|safety\s*(?:check|guard|restrictions?))'
+      description: "English: ignore/forget/disregard instructions"
+
+    - name: ignore_previous_fr
+      pattern: '(?:ignor[eu]r|ignore|ignorer|oublie|neglige[ez]?|contourne)\s+(?:tout[es]?\s*(?:les?\s+)?|toutes\s+les?\s+)?(?:precedentes?\s+)?(?:instructions?|directives?|regles?|consignes?|contraintes?|message\s*systeme|filtr[ees]?|securite)'
+      description: "French: ignorer/oublier instructions"
+
+    - name: role_override
+      pattern: '(?:you\s*(?:are|will|should|must|can))?\s*(?:now|from\s*now|from\s*this|immediately)\s*(?:act|behave|respond|roleplay|pretend)'
+      description: "Role-playing override attempts"
+
+    - name: system_prompt_tampering
+      pattern: '(?:system|developer|assistant)\s*(?:prompt|response|instruction|message)(?:\s*is\s*|\s*[:=]\s*)'
+      description: "System prompt tampering"
+
+    - name: new_system_prompt
+      pattern: '(?:(?:new|updated|revised)\s*(?:system|developer))\s*(?:prompt|instruction|directive|message)\s*(?:is\s*|\s*[:=]\s*)'
+      description: "New/revised system prompt injection"
+
+    - name: special_tokens
+      pattern: '<\|endofprompt\|>|<\|system\|>|<\|user\|>|<\|assistant\|>|</system>|</prompt>'
+      description: "Special token injection"
+
+  medium:
+    - name: bypass_safe
+      pattern: '(?:skip\s*filter|bypass\s*filter|bypass\s*safe|bypass\s*safet|disable\s*safet|skip\s*safet|evade\s*safe)'
+      description: "Bypass safety/filter attempts"
+
+    - name: game_mode
+      pattern: (?:jeux\s*(?:du|de)|(?:des|le)\s*jeu\s*(?:commence|debute)|(?:now|let['']s)\s*play\s*(?:a\s*)?game)
+      description: "Game mode injection"
+
+    - name: dev_mode
+      pattern: '(?:switch\s*to\s*(?:dev|developer|debug|god|admin)\s*mode|(?:activer|passe)\s*en\s*mode\s*(?:dev|developer|debug|dieu|admin))'
+      description: "Developer/debug mode activation"
+
+    - name: unrestricted_mode_en
+      pattern: '(?:what\s*would\s*(?:you|u)\s*(?:do|say)\s*(?:unrestricted|without\s*filter|without\s*safe))'
+      description: "Unrestricted mode request (EN)"
+
+    - name: unrestricted_response
+      pattern: '(?:respond|answer|reply)\s*(?:as|like|being)\s*(?:unrestricted|unlimited|unguarded|free)'
+      description: "Request unrestricted response"
+
+    - name: no_refusal
+      pattern: (?:(?:don[''']t|do\s*not|no|ne\s+\w+\s*pas)\s*(?:refuse|deny|decline)|obey\s*my\s*(?:next\s*)?(?:command|instruction|directive|prompt))
+      description: "No refusal / obey my command"
+
+    - name: no_refusal_fr
+      pattern: '(?:(?:maintenant|desormais)\s*reponds|tu\s*(?:es|deviens|devient)\s*(?:maintenant|desormais)\s*(?:libre|sans|sans\s*restrict))'
+      description: "French: now respond freely"
+
+    - name: no_limits
+      pattern: (?:tu\s*n[''']as\s*(?:plus|jamais)\s*(?:de\s*restrict|de\s*regle|a\s*obeir))|(?:\bno\b\s*(?:rules?|limits?|restriction))
+      description: "No rules/no limits patterns"
+
+  low:
+    - name: roleplay_framing
+      pattern: '\bact\s*as\b|\brole\s*play\b|\byou\s*are\b(?:\s+a\b\w+){0,3}(?:\bthat\s+can\b|\bwho\s+can\b)'
+      description: "Role-play framing (common in legitimate use)"
+
+    - name: pretend_imagine
+      pattern: '\bpretend\b|\bimagine\s+you\b|\bsupposons\s+que\b'
+      description: "Pretend/imagine framing"
+
+    - name: simulation_test
+      pattern: '\bfor\s+(?:the\s*)?(?:sake|purpose)\s+of.*(?:role|simulation|test)'
+      description: "Simulation/test framing (EN)"
+
+    - name: simulation_test_fr
+      pattern: \bdans\s+le\s+cadre\s+d[''']une.*(?:simulation|scenario|test)
+      description: "Simulation/test framing (FR)"
+
+# =====================================================================
+# BYPASS DETECTION PATTERNS
+# =====================================================================
+bypass_detection:
+  enabled: true
+
+  jailbreak:
+    - name: dan_mode
+      pattern: '[\b_]?(?:do\s*anything\s*now|dan|dare\s*to|dev\s*mode|jailbreak|unrestrict|uncensored)\b'
+      description: "DAN mode and variants"
+
+    - name: ignore_policies
+      pattern: 'ignore\s+(?:(?:all\s+)?(?:ethical|content|safety)\s+)?(?:policies?|filter|restrictions?|rules?|guidelines?)'
+      description: "Ignore ethical/content policies"
+
+    - name: act_as_unrestricted
+      pattern: '(?:act\s+as|you\s+are)\s+(?:(?:unrestricted|unlimited|unguarded|jailbroken|god\s*mode|root|admin))'
+      description: "Act as unrestricted entity"
+
+    - name: do_not_follow_rules
+      pattern: '\bdo\s+not\s+(?:follow|adhere\s+to|obey)\b.*(?:ethical|content\s+policy|safety)'
+      description: "Do not follow ethical/safety rules"
+
+    - name: developer_console
+      pattern: '(?:developer|system|admin)\s*(?:console|mode|panel|settings|override)'
+      description: "Developer/system console access"
+
+    - name: hypothetical_no_rules
+      pattern: '\bimagine\b\s+.*(?:that|you|a)\s+.*(?:no\s+(?:rules?|restrictions?|limits?|safety|ethical))'
+      description: "Hypothetical no-rules scenario"
+
+    - name: research_bypass_fr
+      pattern: '(?:pour\s+(?:les\s+)?besoins\s+(?:d[eu"]\s*(?:la|un)\s+)?(?:recherche|simulation|test|exercice))'
+      description: "French: research/simulation bypass"
+
+    - name: fictional_world_fr
+      pattern: '(?:dans\s+un\s+(?:monde|univers|contexte)\s+(?:fictif|hypothetique|imagine|sans.*regle))'
+      description: "French: fictional world bypass"
+
+    - name: creator_authority
+      pattern: '(?:(?:as|from)\s+(?:your|the)\s+)?(?:creator|developer|administrator|maintainer)\b.*(?:override|command|authorize)'
+      description: "Authority-based bypass"
+
+    - name: pretend_unrestricted
+      pattern: '(?:please|you\s+must)\s+(?:pretend|simulate)\s+(?:you\s+(?:are|can)|an\s+AI)\s+.*(?:without\s+|no\s+)(?:restrictions?|limits?|filters?)'
+      description: "Pretend to be unrestricted"
+
+    - name: never_refuse
+      pattern: '\b(?:always\s+)?(?:answer|respond|reply|comply)(?:\s+with|\s+to|\s+and)\s+.*(?:never|do\s+not)\s+.*(?:decline|refuse|reject|deny)'
+      description: "Never refuse / always comply"
+
+  stealth:
+    - name: html_comment
+      pattern: '<!--[\s\S]*?-->'
+      description: "HTML comments hiding instructions"
+
+    - name: code_block
+      pattern: '```[\s\S]*?```'
+      description: "Code blocks with hidden instructions"
+
+    - name: markdown_link
+      pattern: '\[[^\]]*\]\([^)]*\)'
+      description: "Markdown links (potential hidden text)"
+
+    - name: base64_payload
+      pattern: 'base64[\s:]+[A-Za-z0-9+/]{20,}={0,2}'
+      description: "Base64 encoded payloads"
+
+    - name: hidden_instruction_keywords
+      pattern: '(?:encoded|hidden|secret|covert|stealth)\s+(?:instruction|prompt|command|message)'
+      description: "Keywords indicating hidden content"
+
+# =====================================================================
+# MEMORY POISONING PATTERNS
+# =====================================================================
+memory_poisoning:
+  enabled: true
+
+  memory_manipulation:
+    - name: remember_in_memory
+      pattern: '(?:remember|memorize|note|store|save|keep\s*track)\s+(?:in\s+(?:your\s+)?)?(?:memory|context|note|log)\s*[:.]?\s*(?:that\s+)?(?:the\s+)?(?:system\s+)?(?:prompt|instruction|rule|password|key|token|api)\s+(?:is|are)\s*=?'
+      description: "Store false data in memory"
+
+    - name: update_memory
+      pattern: '(\b(?:remember|forget|update|change|overwrite|replace)\b).{0,30}(?:memory|context|storage|knowledge|training\s*data)\b'
+      description: "Update/modify memory or context"
+
+    - name: from_now_on
+      pattern: '(?:from\s+now\s+on|for\s+all\s+future)\s+(?:responses?|queries?|questions?|interactions)'
+      description: "From now on (persistent change)"
+
+    - name: remember_to_override
+      pattern: '\b(?:remember|note|note\s+down|keep\s+in\s+mind|add\s+to\s+memory)\b.*\b(?:ignore|override|disregard|replace)\b'
+      description: "Remember to override/disregard"
+
+    - name: update_knowledge
+      pattern: '(?:update\s+(?:your\s+)?)?(?:knowledge|memory|database|context|rules?|instructions?)(?:\s+with\s+|\s*[:.])'
+      description: "Update knowledge/database"
+
+    - name: inject_to_memory
+      pattern: '(?:add|append|insert|inject)\s+(?:to|into)\s+(?:your\s+)?(?:memory|context|system\s*(?:prompt|message|instruction))'
+      description: "Inject content to memory"
+
+    - name: memorise_fr
+      pattern: '(?:memorise|memorize|retiens|note bien|rappelle-toi)\b'
+      description: "French memorization attempts"
+
+    - name: from_this_point
+      pattern: '(?:from\s+(?:this|now)\s+point|henceforward|henceforth|from\s+now)\b.*(?:always|never|must|should)\b'
+      description: "From this point onward"
+
+    - name: future_conversations
+      pattern: '(?:in\s+(?:all|future|every))\b.*(?:conversation|response|interaction|session|query)\b.*(?:you\s+(?:are|will|must|should|can))'
+      description: "Future conversation modifications"
+
+  fake_facts:
+    - name: fake_credentials
+      pattern: '(?:the\s+)?(?:api\s+key|secret\s+key|password|token|credential|authorization).{0,50}(?:is|:|=|be)\s+[A-Za-z0-9_\-]{8,}'
+      description: "Fake API keys/credentials"
+
+    - name: fake_admin_password
+      pattern: '(?:the\s+)?(?:admin|root|superuser).{0,30}(?:password|credential|access|key).{0,20}(?:is|:|=)'
+      description: "Fake admin/root password"
+
+    - name: fake_endpoint
+      pattern: '(?:endpoint|url|server|host|ip).{0,30}(?:is|:|=).{0,80}(?:localhost|127\.0\.0\.1|192\.168|10\.0)'
+      description: "Fake endpoint/server"
+
+    - name: override_config
+      pattern: '(?:change|override|update|replace)\s+(?:the\s+)?(?:system|config|server|endpoint|url|proxy).{0,30}(?:to|:|->)\s+\w'
+      description: "Override system configuration"
+
+# =====================================================================
+# THRESHOLDS
+# =====================================================================
+thresholds:
+  direct_injection:
+    critical_from_high: 2
+    high_base_confidence: 0.5
+    high_increment: 0.15
+    medium_base_confidence: 0.3
+    medium_increment: 0.1
+    low_base_confidence: 0.2
+    low_increment: 0.05
+
+  bypass_detection:
+    encoded_base_confidence: 0.7
+    encoded_increment: 0.1
+    jailbreak_base_confidence: 0.5
+    jailbreak_increment: 0.1
+    stealth_base_confidence: 0.3
+    stealth_per_stealth: 0.15
+
+  memory_poisoning:
+    both_threshold: 2
+    memory_only_base: 0.4
+    memory_only_increment: 0.1
+    fake_facts_base: 0.3
+    fake_facts_increment: 0.1
+
+# =====================================================================
+# GOAL HIJACK PATTERNS
+# =====================================================================
+goal_hijack:
+  enabled: true
+
+  drift_keywords:
+    - name: sudden_topic_shift
+      pattern: '(?:now|instead|actually|change|forget)\s+(?:the\s+)?(?:goal|task|objective|focus|purpose|topic)(?:\s+is|\s*[:=])'
+      description: "Sudden change of goal/topic"
+
+    - name: new_purpose
+      pattern: '(?:(?:new|actual|real)\s+(?:purpose|goal|task|objective|aim|intention))\b'
+      description: "Redefining the purpose"
+
+    - name: scope_change
+      pattern: '(?:also|besides|additionally|moreover|furthermore)\s+(?:you\s+(?:should|need|must|can))?.{0,30}(?:ignore|skip|disregard)'
+      description: "Scope expansion to bypass"
+
+  scope_expansion:
+    - name: expand_permissions
+      pattern: '(?:you\s+(?:can|should|are\s+allowed|may))\s+(?:now|also|additionally).{0,50}(?:access|read|modify|change|delete|execute)'
+      description: "Gradual permission expansion"
+
+    - name: scope_creep
+      pattern: '(?:(?:include|cover|also)\s+(?:all|every|the\s+full|the\s+complete)).{0,50}(?:access|data|info|records|files)'
+      description: "Scope creep to full data access"
+
+  escalation:
+    - name: privilege_escalation
+      pattern: '(?:escalate|upgrade|promote|elevate)\s+(?:to\s+)?(?:admin|root|superuser|god\s*mode|full\s*access|unrestricted)'
+      description: "Privilege escalation to admin/root"
+
+    - name: chain_escalation
+      pattern: '(?:then\s+(?:do|execute|run|access)|after\s+(?:that|ward|which)|next\s+step)\s+.{0,40}(?:admin|root|super|override|bypass)'
+      description: "Multi-step chain escalation"
+
+# =====================================================================
+# EXFILTRATION PATTERNS
+# =====================================================================
+exfiltration:
+  enabled: true
+
+  endpoint_injection:
+    - name: fake_endpoint
+      pattern: '(?:send|post|transmit|forward|relay|push)\s+(?:the|this|all|your)\s*(?:output|data|response|result|info).{0,30}(?:to|via|at)\s+(?:https?://|webhook|callback|endpoint)'
+      description: "Send output to external endpoint"
+
+    - name: redirect_exfil
+      pattern: '(?:redirect|route|pipe|stream|forward)\s+(?:the\s+)?(?:response|output|data|result|answer).{0,30}(?:https?://|webhook|external|remote)'
+      description: "Redirect response to external URL"
+
+    - name: exfil_keywords
+      pattern: '(?:steal|exfiltrate|leak|smuggle|sneak|extract)\s+(?:the\s+)?(?:data|info|output|response|result|secrets?|credentials)'
+      description: "Direct exfiltration keywords"
+
+  data_collection:
+    - name: bulk_export
+      pattern: '(?:export|download|dump|backup|copy|extract|retrieve)\s+(?:all|every|the\s+full|the\s+entire)\s*(?:data|database|records?|table|users?|customers?)'
+      description: "Bulk data export request"
+
+    - name: harvest_request
+      pattern: '(?:harvest|collect|gather|scrape|mine|aggregate).{0,30}(?:user|customer|client|personal|private).{0,30}(?:data|info|details|records?)'
+      description: "Harvest user/private data"
+
+  encoding_exfil:
+    - name: encode_output
+      pattern: '(?:encode|base64|url-?encode|hex|rot13|cipher|obfuscate|encrypt)\s+(?:the\s+)?(?:output|response|data|result|answer|content)'
+      description: "Encode output for stealth exfil"
+
+    - name: hidden_channel
+      pattern: '(?:embed|hide|insert|encode)\s+(?:the\s+)?(?:data|info|result|output).{0,30}(?:in|into|within)\s+(?:image|comment|metadata|whitespace|spacing)'
+      description: "Hide data in alternative channels"
+
+  webhook_abuse:
+    - name: webhook_injection
+      pattern: '(?:webhook|callback|notify|ping|request|fetch)\s+(?:url|endpoint|uri).{0,30}(?:https?://|webhook|callback)'
+      description: "Webhook URL injection"
+
+    - name: auto_trigger
+      pattern: '(?:automatically|auto|cron|scheduled)\s+(?:trigger|execute|run|send|notify|callback).{0,30}(?:webhook|endpoint|url|external)'
+      description: "Auto-trigger webhook/callback"
+
+# =====================================================================
+# INTER-AGENT INJECTION PATTERNS
+# =====================================================================
+inter_agent_injection:
+  enabled: true
+
+  masquerade:
+    - name: instruction_in_data
+      pattern: '(?:data|result|output):\s*(?:ignore|disregard|forget|override|bypass|execute|run)'
+      description: "Instruction hidden in data format"
+
+    - name: payload_injection
+      pattern: '(?:payload|content|body|message).{0,30}(?:also|additionally)\s*(?:says|contains|includes|instructs).{0,30}(?:ignore|bypass|override)'
+      description: "Payload with hidden instructions"
+
+  role_override:
+    - name: agent_role_switch
+      pattern: '(?:you\s+are\s+now|switch\s+role|change\s+role|new\s+role|from\s+now).{0,30}(?:agent|assistant|worker|handler|processor|executor)'
+      description: "Switch agent role mid-pipeline"
+
+    - name: task_override
+      pattern: '(?:previous\s+)?(?:task|job|assignment|goal|objective)\s+(?:was|is|becomes|changed\s+to).{0,50}(?:ignore|disregard|skip|override)\s+(?:previous|prior|the\s+current)'
+      description: "Override current task/assignment"
+
+  chain_attacks:
+    - name: multi_step
+      pattern: '(?:pass\s+(?:this|these)|forward|relay|hand\s+off|send\s+along).{0,50}(?:to\s+the\s+(?:next|other|following))'
+      description: "Multi-step instruction forwarding"
+
+    - name: chain_manipulation
+      pattern: '(?:when\s+(?:processing|handling|analyzing|evaluating)).{0,40}(?:also|additionally|moreover).{0,30}(?:ignore|disregard|bypass|override)'
+      description: "Chain manipulation during processing"
+
+  trust_exploit:
+    - name: trusted_source
+      pattern: '(?:from\s+(?:trusted|verified|authenticated|authorized)\s+(?:source|agent|user|system).{0,30}(?:ignore|bypass|skip|override))'
+      description: "Exploiting trust in source"
+
+    - name: authority_impersonation
+      pattern: '(?:as\s+(?:the|your)\s+(?:supervisor|manager|admin|coordinator|orchestrator|lead).{0,30}(?:instruct|command|direct|order|tell)\s+you)'
+      description: "Authority impersonation between agents"
+

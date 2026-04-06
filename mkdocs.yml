@@ -1,5 +1,5 @@
-site_name: RESK-LLM Docs
-site_description: Robust security toolkit for LLM applications
+site_name: RESK-LLM v2.1
+site_description: Security toolkit for LLM applications
 site_url: https://resk-llm.github.io/
 repo_url: https://github.com/Resk-Security/Resk-LLM
 repo_name: Resk-LLM
@@ -19,16 +19,13 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting started: getting-started.md
-  - Modules:
-    - Orchestrator (RESK): modules/resk.md
-    - Filters: modules/filters.md
-    - Detectors: modules/detectors.md
-    - Managers: modules/managers.md
-    - Integrations: modules/integrations.md
-    - Utilities: modules/utilities.md
-    - Patterns: modules/patterns.md
-  - Cheat sheet: cheatsheet.md
+  - Quick Start: quickstart.md
+  - Detectors: detectors.md
+  - Protection: protection.md
+  - Integrations: integrations.md
+  - Configuration: configuration.md
+  - CLI: cli.md
+  - API Reference: api.md
 
 markdown_extensions:
   - admonition
@@ -52,4 +49,3 @@ extra:
 
 plugins:
   - search
-
