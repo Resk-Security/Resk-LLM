@@ -7,6 +7,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![LLM Security](https://img.shields.io/badge/LLM-Security-red)](https://github.com/Resk-Security/Resk-LLM)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://resk-llm.github.io/)
 
 # RESK-LLM v2.1
 

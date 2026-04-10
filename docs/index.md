@@ -1,6 +1,6 @@
 # RESK-LLM Documentation
 
-See [README.md](../README.md) for the main documentation.
+See the [README.md](https://github.com/Resk-Security/Resk-LLM/blob/main/README.md) on GitHub for the main project documentation.
 
 ## Quick Navigation
 
