@@ -1,4 +1,5 @@
 """ACL Decision Tree detector - role-based access control via configurable decision trees."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -90,7 +91,6 @@ class ACLDecisionTreeDetector(BaseDetector):
         # Decision node — has condition and branches
         condition_key = node.get("condition")
         branches = node.get("branches", {})
-        default_branch = node.get("default")
 
         if condition_key:
             value = lookup.get(condition_key)

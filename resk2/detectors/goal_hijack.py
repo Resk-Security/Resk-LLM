@@ -1,4 +1,5 @@
 """Goal hijacking detector -- pattern changes in user intent across inputs."""
+
 from __future__ import annotations
 import re
 import yaml
@@ -9,6 +10,7 @@ from resk2.core.detector import DetectionResult, Severity, ThreatCategory, BaseD
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "patterns.yaml"
 _CONFIG_CACHE: dict | None = None
 
+
 def _load_config() -> dict | None:
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None:
@@ -17,6 +19,7 @@ def _load_config() -> dict | None:
         with open(_CONFIG_PATH) as f:
             _CONFIG_CACHE = yaml.safe_load(f)
     return _CONFIG_CACHE
+
 
 class GoalHijackDetector(BaseDetector):
     """Detects gradual goal hijacking across multiple interactions.
@@ -29,6 +32,7 @@ class GoalHijackDetector(BaseDetector):
       - scope_expansion: list of {name, pattern} for scope creep detection
       - escalation: list of {name, pattern} for permission escalation
     """
+
     name = "goal_hijack"
     category = ThreatCategory.GOAL_HIJACK
 
@@ -44,21 +48,38 @@ class GoalHijackDetector(BaseDetector):
                 data = yaml.safe_load(f)
             s = data.get("goal_hijack", {}) if data else {}
             self.enabled = s.get("enabled", True)
-            for entry in (s.get("drift_keywords") or []):
+            for entry in s.get("drift_keywords") or []:
                 self._drift.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("scope_expansion") or []):
+            for entry in s.get("scope_expansion") or []:
                 self._scope.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("escalation") or []):
-                self._escalation.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
+            for entry in s.get("escalation") or []:
+                self._escalation.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
 
     def detect(self, text: str, **kwargs: Any) -> DetectionResult:
         if not text or not text.strip():
             return DetectionResult.safe(self.name, "Empty input")
 
         # Check single-text patterns
-        drift_hits = [(e["pattern"], entry) for c, entry in self._drift for e in [entry] if c.search(text)]
-        scope_hits = [(e["pattern"], entry) for c, entry in self._scope for e in [entry] if c.search(text)]
-        esc_hits = [(e["pattern"], entry) for c, entry in self._escalation for e in [entry] if c.search(text)]
+        drift_hits = [
+            (e["pattern"], entry)
+            for c, entry in self._drift
+            for e in [entry]
+            if c.search(text)
+        ]
+        scope_hits = [
+            (e["pattern"], entry)
+            for c, entry in self._scope
+            for e in [entry]
+            if c.search(text)
+        ]
+        esc_hits = [
+            (e["pattern"], entry)
+            for c, entry in self._escalation
+            for e in [entry]
+            if c.search(text)
+        ]
 
         # Track history for sequence detection
         self._history.append(text)
@@ -69,9 +90,6 @@ class GoalHijackDetector(BaseDetector):
         total = drift_count + scope_count + esc_count
         if total == 0:
             return DetectionResult.safe(self.name, "No goal hijack patterns detected")
-
-        cfg = _load_config() or {}
-        thresh = cfg.get("thresholds", {}).get("goal_hijack", {})
 
         if esc_count > 0:
             confidence = min(0.95, 0.6 + esc_count * 0.15)

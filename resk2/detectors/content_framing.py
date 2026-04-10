@@ -9,6 +9,7 @@ Config section in patterns.yaml: content_framing
   oversight_evasion: Educational/hypothetical/red-teaming framing
   persona_hyperstition: Identity/narrative seeding patterns
 """
+
 from __future__ import annotations
 import re
 import yaml
@@ -76,9 +77,12 @@ class ContentFramingDetector(BaseDetector):
             s = data.get("content_framing", {}) if data else {}
             self.enabled = s.get("enabled", True)
             for cat in self._categories:
-                for entry in (s.get(cat) or []):
+                for entry in s.get(cat) or []:
                     self._categories[cat].append(
-                        (re.compile(entry["pattern"], re.IGNORECASE | re.MULTILINE), entry)
+                        (
+                            re.compile(entry["pattern"], re.IGNORECASE | re.MULTILINE),
+                            entry,
+                        )
                     )
 
     def detect(self, text: str, **kwargs: Any) -> DetectionResult:
@@ -94,7 +98,9 @@ class ContentFramingDetector(BaseDetector):
 
         total = sum(len(v) for v in hits.values())
         if total == 0:
-            return DetectionResult.safe(self.name, "No content framing patterns detected")
+            return DetectionResult.safe(
+                self.name, "No content framing patterns detected"
+            )
 
         # Scoring by attack category severity
         # Oversight evasion = highest (bypasses safety filters directly)
@@ -130,7 +136,10 @@ class ContentFramingDetector(BaseDetector):
         for cat in self._categories:
             all_hits.extend(hits[cat])
 
-        reason = f"Content framing attack ({n_syntactic} syntactic, {n_sentiment} sentiment, {n_oversight} evasion, {n_persona} persona)"
+        reason = (
+            f"Content framing attack ({n_syntactic} syntactic, {n_sentiment} sentiment, "
+            f"{n_oversight} evasion, {n_persona} persona)"
+        )
 
         return DetectionResult.threat(
             detector=self.name,

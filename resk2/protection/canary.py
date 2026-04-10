@@ -1,15 +1,17 @@
 """Canary token manager -- detects data leaks in LLM responses."""
+
 from __future__ import annotations
-import hashlib
 import secrets
 import re
 from datetime import datetime, timezone
 from typing import Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
 
 @dataclass
 class CanaryToken:
     """A single canary token with metadata."""
+
     token: str
     secret: str
     created_at: datetime
@@ -17,13 +19,16 @@ class CanaryToken:
     leaked: bool = False
     leaked_at: datetime | None = None
 
+
 @dataclass
 class CanaryResult:
     """Result of a leak detection check."""
+
     has_leak: bool
     leaked_tokens: list[dict[str, Any]]
     total_tokens_inserted: int
     total_tokens_leaked: int
+
 
 class CanaryManager:
     """Inserts canary tokens to detect if data is being leaked.
@@ -38,7 +43,7 @@ class CanaryManager:
     """
 
     # Pattern to match canary tokens in text
-    _TOKEN_PATTERN = re.compile(r'CANARY\[([a-f0-9]{32})\]')
+    _TOKEN_PATTERN = re.compile(r"CANARY\[([a-f0-9]{32})\]")
     # Marker format
     _MARKER_FMT = "CANARY[{secret}]"
 
@@ -73,20 +78,26 @@ class CanaryManager:
                 if not token_info.leaked:
                     token_info.leaked = True
                     token_info.leaked_at = datetime.now(timezone.utc)
-                leaked.append({
-                    "secret": secret,
-                    "context": token_info.context,
-                    "created_at": token_info.created_at.isoformat(),
-                    "leaked_at": token_info.leaked_at.isoformat() if token_info.leaked_at else None,
-                })
+                leaked.append(
+                    {
+                        "secret": secret,
+                        "context": token_info.context,
+                        "created_at": token_info.created_at.isoformat(),
+                        "leaked_at": token_info.leaked_at.isoformat()
+                        if token_info.leaked_at
+                        else None,
+                    }
+                )
             elif check_all:
                 # Unknown tokens found, could be from a different instance
-                leaked.append({
-                    "secret": secret,
-                    "context": "unknown",
-                    "created_at": None,
-                    "leaked_at": datetime.now(timezone.utc).isoformat(),
-                })
+                leaked.append(
+                    {
+                        "secret": secret,
+                        "context": "unknown",
+                        "created_at": None,
+                        "leaked_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
 
         return CanaryResult(
             has_leak=len(leaked) > 0,
@@ -105,7 +116,7 @@ class CanaryManager:
                 token=token,
                 secret=secret,
                 created_at=datetime.now(timezone.utc),
-                context=f"{context} (token {i+1}/{count})",
+                context=f"{context} (token {i + 1}/{count})",
             )
             # Spread tokens at different positions
             position = (len(result) * (i + 1)) // (count + 1)

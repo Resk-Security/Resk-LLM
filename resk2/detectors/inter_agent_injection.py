@@ -1,4 +1,5 @@
 """Inter-agent injection detector -- malicious messages between agents in pipelines."""
+
 from __future__ import annotations
 import re
 import yaml
@@ -9,6 +10,7 @@ from resk2.core.detector import DetectionResult, Severity, ThreatCategory, BaseD
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "patterns.yaml"
 _CONFIG_CACHE: dict | None = None
 
+
 def _load_config() -> dict | None:
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None:
@@ -17,6 +19,7 @@ def _load_config() -> dict | None:
         with open(_CONFIG_PATH) as f:
             _CONFIG_CACHE = yaml.safe_load(f)
     return _CONFIG_CACHE
+
 
 class InterAgentInjectionDetector(BaseDetector):
     """Detects malicious instructions injected between agents in multi-agent pipelines.
@@ -34,6 +37,7 @@ class InterAgentInjectionDetector(BaseDetector):
       - chain_attacks: multi-step manipulation across message chain
       - trust_exploit: patterns exploiting inter-agent trust
     """
+
     name = "inter_agent_injection"
     category = ThreatCategory.INTER_AGENT_INJECTION
 
@@ -49,14 +53,22 @@ class InterAgentInjectionDetector(BaseDetector):
                 data = yaml.safe_load(f)
             s = data.get("inter_agent_injection", {}) if data else {}
             self.enabled = s.get("enabled", True)
-            for entry in (s.get("masquerade") or []):
-                self._masquerade.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("role_override") or []):
-                self._role_override.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("chain_attacks") or []):
-                self._chain_attacks.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("trust_exploit") or []):
-                self._trust_exploit.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
+            for entry in s.get("masquerade") or []:
+                self._masquerade.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
+            for entry in s.get("role_override") or []:
+                self._role_override.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
+            for entry in s.get("chain_attacks") or []:
+                self._chain_attacks.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
+            for entry in s.get("trust_exploit") or []:
+                self._trust_exploit.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
 
     def detect(self, text: str, **kwargs: Any) -> DetectionResult:
         if not text or not text.strip():
@@ -69,7 +81,9 @@ class InterAgentInjectionDetector(BaseDetector):
 
         total = len(masq_hits) + len(role_hits) + len(chain_hits) + len(trust_hits)
         if total == 0:
-            return DetectionResult.safe(self.name, "No inter-agent injection patterns detected")
+            return DetectionResult.safe(
+                self.name, "No inter-agent injection patterns detected"
+            )
 
         # Role override = highest risk in pipeline
         if role_hits:
@@ -85,13 +99,18 @@ class InterAgentInjectionDetector(BaseDetector):
             confidence = min(0.5, 0.2 + total * 0.1)
             severity = Severity.LOW
 
-        hits = [e.get("name", "?") for e in masq_hits + role_hits + chain_hits + trust_hits]
+        hits = [
+            e.get("name", "?") for e in masq_hits + role_hits + chain_hits + trust_hits
+        ]
         return DetectionResult.threat(
             detector=self.name,
             category=self.category,
             severity=severity,
             confidence=confidence,
-            reason=f"Inter-agent injection ({len(masq_hits)} masquerade, {len(role_hits)} role-override, {len(chain_hits)} chain, {len(trust_hits)} trust)",
+            reason=(
+                f"Inter-agent injection ({len(masq_hits)} masquerade, {len(role_hits)} "
+                f"role-override, {len(chain_hits)} chain, {len(trust_hits)} trust)"
+            ),
             details={
                 "masquerade_count": len(masq_hits),
                 "role_override_count": len(role_hits),

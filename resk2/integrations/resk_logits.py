@@ -1,7 +1,7 @@
 """Integration with resk-logits for GPU-accelerated logits processing."""
+
 from __future__ import annotations
 from pathlib import Path
-from typing import Any
 import yaml
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "patterns.yaml"
@@ -30,6 +30,7 @@ class ReskLogitsIntegration:
 
         try:
             from resklogits import ShadowBanProcessor, MultiLevelShadowBanProcessor
+
             self._shadow_ban_cls = ShadowBanProcessor
             self._multi_level_cls = MultiLevelShadowBanProcessor
             self.available = True

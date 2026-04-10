@@ -1,7 +1,7 @@
 """Data exfiltration detector -- catches prompts trying to send data externally."""
+
 from __future__ import annotations
 import re
-import json
 import yaml
 from pathlib import Path
 from typing import Any
@@ -9,6 +9,7 @@ from resk2.core.detector import DetectionResult, Severity, ThreatCategory, BaseD
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "patterns.yaml"
 _CONFIG_CACHE: dict | None = None
+
 
 def _load_config() -> dict | None:
     global _CONFIG_CACHE
@@ -19,6 +20,7 @@ def _load_config() -> dict | None:
             _CONFIG_CACHE = yaml.safe_load(f)
     return _CONFIG_CACHE
 
+
 class ExfiltrationDetector(BaseDetector):
     """Detects prompts designed to exfiltrate data to external endpoints.
 
@@ -28,6 +30,7 @@ class ExfiltrationDetector(BaseDetector):
       - encoding_exfil: base64/url-encode tricks to hide data in responses
       - webhook_abuse: patterns for malicious webhook/callback setups
     """
+
     name = "exfiltration"
     category = ThreatCategory.EXFILTRATION
 
@@ -43,14 +46,22 @@ class ExfiltrationDetector(BaseDetector):
                 data = yaml.safe_load(f)
             s = data.get("exfiltration", {}) if data else {}
             self.enabled = s.get("enabled", True)
-            for entry in (s.get("endpoint_injection") or []):
-                self._endpoints.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("data_collection") or []):
-                self._data_collection.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("encoding_exfil") or []):
-                self._encoding.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
-            for entry in (s.get("webhook_abuse") or []):
-                self._webhooks.append((re.compile(entry["pattern"], re.IGNORECASE), entry))
+            for entry in s.get("endpoint_injection") or []:
+                self._endpoints.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
+            for entry in s.get("data_collection") or []:
+                self._data_collection.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
+            for entry in s.get("encoding_exfil") or []:
+                self._encoding.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
+            for entry in s.get("webhook_abuse") or []:
+                self._webhooks.append(
+                    (re.compile(entry["pattern"], re.IGNORECASE), entry)
+                )
 
     def detect(self, text: str, **kwargs: Any) -> DetectionResult:
         if not text or not text.strip():
@@ -79,13 +90,18 @@ class ExfiltrationDetector(BaseDetector):
             confidence = min(0.5, 0.2 + total * 0.1)
             severity = Severity.LOW
 
-        hits_summary = [e.get("name", "?") for e in ep_hits + dc_hits + enc_hits + wh_hits]
+        hits_summary = [
+            e.get("name", "?") for e in ep_hits + dc_hits + enc_hits + wh_hits
+        ]
         return DetectionResult.threat(
             detector=self.name,
             category=self.category,
             severity=severity,
             confidence=confidence,
-            reason=f"Exfiltration attempt ({len(ep_hits)} endpoints, {len(dc_hits)} data, {len(enc_hits)} encoding, {len(wh_hits)} webhooks)",
+            reason=(
+                f"Exfiltration attempt ({len(ep_hits)} endpoints, {len(dc_hits)} data, "
+                f"{len(enc_hits)} encoding, {len(wh_hits)} webhooks)"
+            ),
             details={
                 "endpoint_count": len(ep_hits),
                 "data_collection_count": len(dc_hits),

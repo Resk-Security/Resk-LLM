@@ -1,4 +1,5 @@
 """Conversation context manager for multi-turn security tracking."""
+
 from __future__ import annotations
 import time
 from dataclasses import dataclass, field
@@ -30,8 +31,13 @@ class ConversationContext:
         self._max_ever_severity = 0
         self._escalation_window = escalation_window
 
-    def add_entry(self, text: str, result_or_blocked: Any, severity: str | None = None,
-                   detector_count: int | None = None) -> None:
+    def add_entry(
+        self,
+        text: str,
+        result_or_blocked: Any,
+        severity: str | None = None,
+        detector_count: int | None = None,
+    ) -> None:
         """Add a conversation entry.
 
         Two calling conventions supported:
@@ -49,7 +55,9 @@ class ConversationContext:
                 text=text,
                 blocked=blocked,
                 threat_count=len(threats) if isinstance(threats, (list, tuple)) else 0,
-                max_severity=severity_val.value if hasattr(severity_val, "value") else str(severity_val),
+                max_severity=severity_val.value
+                if hasattr(severity_val, "value")
+                else str(severity_val),
                 sanitized=bool(sanitized_text and sanitized_text != text),
             )
             dct = detector_count if detector_count is not None else entry.threat_count
@@ -106,8 +114,12 @@ class ConversationContext:
         blocks_second = sum(1 for e in second_half if e.blocked)
         sev_first = max(SEVERITY_SCORES.get(e.max_severity, 0) for e in first_half)
         sev_second = max(SEVERITY_SCORES.get(e.max_severity, 0) for e in second_half)
-        threat_delta = max(0, threats_second - threats_first) / max(1, threats_first + threats_second)
-        block_delta = max(0, blocks_second - blocks_first) / max(1, blocks_first + blocks_second)
+        threat_delta = max(0, threats_second - threats_first) / max(
+            1, threats_first + threats_second
+        )
+        block_delta = max(0, blocks_second - blocks_first) / max(
+            1, blocks_first + blocks_second
+        )
         severity_delta = max(0, sev_second - sev_first) / 10.0
         escalation = 0.4 * threat_delta + 0.3 * block_delta + 0.3 * severity_delta
         if len(second_half) > 1:

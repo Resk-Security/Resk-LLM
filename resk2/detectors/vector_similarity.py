@@ -1,4 +1,5 @@
 """Vector similarity detector - cosine similarity with pluggable backends."""
+
 from __future__ import annotations
 
 import math
@@ -87,7 +88,7 @@ class LocalTFIDFBackend(VectorBackend):
                     "metadata": {"pattern": self._patterns[i][:100]},
                 }
             )
-        scores.sort(key=lambda x: x["score"], reverse=True)
+        scores.sort(key=lambda x: x["score"], reverse=True)  # type: ignore[arg-type,return-value]
         return scores[:top_k]
 
 

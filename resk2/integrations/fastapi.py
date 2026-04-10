@@ -1,4 +1,5 @@
 """FastAPI middleware for RESK-LLM."""
+
 from __future__ import annotations
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -6,32 +7,42 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from resk2.core import SecurityPipeline, PipelineResult
 
+
 class ReskMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware that scans request bodies through security pipeline.
-    
+
     Usage:
         from fastapi import FastAPI
         from resk2.integrations import ReskMiddleware
-        
+
         app = FastAPI()
-        app.add_middleware(ReskMiddleware, 
+        app.add_middleware(ReskMiddleware,
                           excluded_paths=["/health", "/docs"],
                           on_block=custom_block_handler)
     """
-    
-    def __init__(self, app, pipeline: SecurityPipeline | None = None,
-                 excluded_paths: list[str] | None = None,
-                 on_block: Callable | None = None,
-                 include_response_check: bool = True):
+
+    def __init__(
+        self,
+        app,
+        pipeline: SecurityPipeline | None = None,
+        excluded_paths: list[str] | None = None,
+        on_block: Callable | None = None,
+        include_response_check: bool = True,
+    ):
         super().__init__(app)
         self.pipeline = pipeline or SecurityPipeline()
-        self.excluded_paths = excluded_paths or ["/health", "/docs", "/openapi.json", "/redoc"]
+        self.excluded_paths = excluded_paths or [
+            "/health",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+        ]
         self.on_block = on_block or self._default_block
         self.include_response_check = include_response_check
 
     @staticmethod
     def _default_block(request: Request, result: PipelineResult) -> JSONResponse:
-        threats = ", ".join(t.reason for t in result.threats)
+        _ = ", ".join(t.reason for t in result.threats)
         return JSONResponse(
             status_code=400,
             content={
@@ -57,7 +68,7 @@ class ReskMiddleware(BaseHTTPMiddleware):
                 return await call_next(request)
 
             text = body.decode("utf-8", errors="replace")
-            
+
             # Check input through pipeline
             result = self.pipeline.run(text)
             if result.blocked:
@@ -73,7 +84,7 @@ class ReskMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Optionally check response
-        if self.include_response_check and hasattr(request.state, 'security_result'):
+        if self.include_response_check and hasattr(request.state, "security_result"):
             # Response check placeholder for future implementation
             pass
 

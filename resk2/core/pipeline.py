@@ -1,13 +1,17 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from .detector import DetectionResult, BaseDetector, Severity
 from .config import SecurityConfig
+
+if TYPE_CHECKING:
+    from .context import ConversationContext
 
 
 @dataclass
 class PipelineResult:
     """Aggregated result from the full security pipeline."""
+
     input_text: str
     results: list[DetectionResult] = field(default_factory=list)
     blocked: bool = False
@@ -25,10 +29,18 @@ class PipelineResult:
 
     @property
     def max_severity(self) -> Severity:
-        severity_order = [Severity.INFO, Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL]
+        severity_order = [
+            Severity.INFO,
+            Severity.LOW,
+            Severity.MEDIUM,
+            Severity.HIGH,
+            Severity.CRITICAL,
+        ]
         if not self.threats:
             return Severity.INFO
-        return max(self.threats, key=lambda r: severity_order.index(r.severity)).severity
+        return max(
+            self.threats, key=lambda r: severity_order.index(r.severity)
+        ).severity
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -65,7 +77,9 @@ class SecurityPipeline:
         self._detectors = [d for d in self._detectors if d.name != detector_name]
         return len(self._detectors) < before
 
-    def run(self, text: str, context: "ConversationContext | None" = None, **kwargs: Any) -> PipelineResult:
+    def run(
+        self, text: str, context: "ConversationContext | None" = None, **kwargs: Any
+    ) -> PipelineResult:
         """Run all enabled detectors on the input text.
 
         Args:
@@ -83,12 +97,14 @@ class SecurityPipeline:
                 det_result = detector.analyze(text, context=context, **kwargs)
                 results.append(det_result)
             except Exception as e:
-                results.append(DetectionResult(
-                    detector=detector.name,
-                    is_threat=False,
-                    severity=Severity.INFO,
-                    reason=f"Detector error: {e}",
-                ))
+                results.append(
+                    DetectionResult(
+                        detector=detector.name,
+                        is_threat=False,
+                        severity=Severity.INFO,
+                        reason=f"Detector error: {e}",
+                    )
+                )
 
         result.results = results
         for r in results:
@@ -108,7 +124,9 @@ class SecurityPipeline:
         result.severity = result.max_severity
         return result
 
-    def run_safe(self, text: str, context: "ConversationContext | None" = None, **kwargs: Any) -> tuple[bool, PipelineResult]:
+    def run_safe(
+        self, text: str, context: "ConversationContext | None" = None, **kwargs: Any
+    ) -> tuple[bool, PipelineResult]:
         """Run pipeline and return (is_safe, result) tuple."""
         result = self.run(text, context=context, **kwargs)
         return result.is_safe, result

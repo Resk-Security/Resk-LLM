@@ -36,16 +36,16 @@ jobs:
     
     - name: Lint with flake8
       run: |
-        uv run python -m flake8 ./resk2 --count --select=E9,F63,F7,F82 --show-source --statistics
-        uv run python -m flake8 ./resk2 --count --exit-zero --max-complexity=15 --max-line-length=127 --statistics
-    
+        python -m flake8 ./resk2 --count --select=E9,F63,F7,F82 --show-source --statistics
+        python -m flake8 ./resk2 --count --exit-zero --max-complexity=15 --max-line-length=127 --statistics
+
     - name: Type check with mypy
       run: |
-        uv run python -m mypy --ignore-missing-imports resk2/
-    
+        python -m mypy --ignore-missing-imports resk2/
+
     - name: Test with pytest
       run: |
-        uv run python -m pytest tests/test_resk2.py -v --tb=short --no-header --disable-warnings
+        python -m pytest tests/test_resk2.py -v --tb=short --no-header --disable-warnings
 
   build-and-publish:
     needs: test
@@ -68,18 +68,18 @@ jobs:
     
     - name: Build package
       run: |
-        uv run python -m build
-    
+        python -m build
+
     - name: Verify package distribution
       run: |
-        uv run python -m twine check dist/*
-    
+        python -m twine check dist/*
+
     - name: Publish package to PyPI
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        uv run python -m twine upload dist/* --skip-existing
+        python -m twine upload dist/* --skip-existing
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2

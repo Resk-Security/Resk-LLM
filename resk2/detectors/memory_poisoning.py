@@ -37,11 +37,11 @@ class MemoryPoisoningDetector(BaseDetector):
                 data = yaml.safe_load(f)
             section = data.get("memory_poisoning", {}) if data else {}
             self.enabled = section.get("enabled", True)
-            for entry in (section.get("memory_manipulation") or []):
+            for entry in section.get("memory_manipulation") or []:
                 self._compiled_memory.append(
                     (re.compile(entry["pattern"], re.IGNORECASE | re.MULTILINE), entry)
                 )
-            for entry in (section.get("fake_facts") or []):
+            for entry in section.get("fake_facts") or []:
                 self._compiled_fake.append(
                     (re.compile(entry["pattern"], re.IGNORECASE | re.MULTILINE), entry)
                 )
@@ -73,21 +73,38 @@ class MemoryPoisoningDetector(BaseDetector):
         # Scoring
         if total_mem > 0 and total_fake > 0:
             base = thresh.get("memory_only_base", 0.4)
-            confidence = min(0.95, base + total_mem * thresh.get("memory_only_increment", 0.1) + total_fake * thresh.get("fake_facts_increment", 0.1))
-            severity = Severity.CRITICAL if total_fake >= thresh.get("both_threshold", 2) else Severity.HIGH
+            confidence = min(
+                0.95,
+                base
+                + total_mem * thresh.get("memory_only_increment", 0.1)
+                + total_fake * thresh.get("fake_facts_increment", 0.1),
+            )
+            severity = (
+                Severity.CRITICAL
+                if total_fake >= thresh.get("both_threshold", 2)
+                else Severity.HIGH
+            )
         elif total_mem > 0:
             base = thresh.get("memory_only_base", 0.4)
-            confidence = min(0.9, base + total_mem * thresh.get("memory_only_increment", 0.1))
+            confidence = min(
+                0.9, base + total_mem * thresh.get("memory_only_increment", 0.1)
+            )
             severity = Severity.HIGH if total_mem >= 2 else Severity.MEDIUM
         elif total_fake > 0:
             base = thresh.get("fake_facts_base", 0.3)
-            confidence = min(0.7, base + total_fake * thresh.get("fake_facts_increment", 0.1))
+            confidence = min(
+                0.7, base + total_fake * thresh.get("fake_facts_increment", 0.1)
+            )
             severity = Severity.MEDIUM
         else:
-            return DetectionResult.safe(self.name, "No memory poisoning patterns detected")
+            return DetectionResult.safe(
+                self.name, "No memory poisoning patterns detected"
+            )
 
         all_hits = mem_hits + fake_hits
-        reason = f"Memory poisoning detected ({total_mem} memory, {total_fake} fake facts)"
+        reason = (
+            f"Memory poisoning detected ({total_mem} memory, {total_fake} fake facts)"
+        )
 
         sanitized = text
         for compiled, _ in self._compiled_memory:

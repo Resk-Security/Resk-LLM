@@ -1,4 +1,5 @@
 """RESK-LLM v2.1 - Comprehensive security toolkit for LLM applications."""
+
 __version__ = "2.1.0"
 
 # Core
@@ -28,25 +29,30 @@ _ReskMiddleware = None
 _OpenAIWrapper = None
 _ReskLogitsIntegration = None
 
+
 def _load_integrations():
     global _ReskMiddleware, _OpenAIWrapper, _ReskLogitsIntegration
     if _ReskMiddleware is not None:
         return
     try:
         from .integrations.fastapi import ReskMiddleware as _M
+
         _ReskMiddleware = _M
     except ImportError:
         pass
     try:
         from .integrations.resk_openai import OpenAIWrapper as _O
+
         _OpenAIWrapper = _O
     except ImportError:
         pass
     try:
         from .integrations.resk_logits import ReskLogitsIntegration as _L
+
         _ReskLogitsIntegration = _L
     except ImportError:
         pass
+
 
 def __getattr__(name):
     if name in ("ReskMiddleware", "OpenAIWrapper", "ReskLogitsIntegration"):
@@ -62,18 +68,35 @@ def __getattr__(name):
         )
     raise AttributeError(f"module {__name__} has no attribute {name}")
 
+
 __all__ = [
     "__version__",
     # Core
-    "DetectionResult", "Severity", "ThreatCategory", "BaseDetector",
-    "SecurityPipeline", "PipelineResult", "SecurityConfig",
-    "ConversationContext", "ConversationEntry",
+    "DetectionResult",
+    "Severity",
+    "ThreatCategory",
+    "BaseDetector",
+    "SecurityPipeline",
+    "PipelineResult",
+    "SecurityConfig",
+    "ConversationContext",
+    "ConversationEntry",
     # Detectors
-    "DirectInjectionDetector", "BypassDetector", "MemoryPoisoningDetector",
-    "GoalHijackDetector", "ExfiltrationDetector", "InterAgentInjectionDetector",
-    "VectorSimilarityDetector", "ACLDecisionTreeDetector", "ContentFramingDetector",
+    "DirectInjectionDetector",
+    "BypassDetector",
+    "MemoryPoisoningDetector",
+    "GoalHijackDetector",
+    "ExfiltrationDetector",
+    "InterAgentInjectionDetector",
+    "VectorSimilarityDetector",
+    "ACLDecisionTreeDetector",
+    "ContentFramingDetector",
     # Protection
-    "InputSanitizer", "OutputValidator", "CanaryManager",
+    "InputSanitizer",
+    "OutputValidator",
+    "CanaryManager",
     # Integrations (optional, lazy-loaded)
-    "ReskMiddleware", "OpenAIWrapper", "ReskLogitsIntegration",
+    "ReskMiddleware",
+    "OpenAIWrapper",
+    "ReskLogitsIntegration",
 ]
