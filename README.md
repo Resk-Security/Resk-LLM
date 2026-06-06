@@ -7,7 +7,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![LLM Security](https://img.shields.io/badge/LLM-Security-red)](https://github.com/Resk-Security/Resk-LLM)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://resk-llm.github.io/)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)]([https://resk-llm.github.io/](https://resk-security.github.io/Resk-LLM/))
 
 # RESK-LLM v2.1
 
@@ -17,6 +17,7 @@
 - **Dependencies**: `pyyaml` only. No ML frameworks required.
 - **Backwards compatible**: Wraps the original `resk_llm` API.
 - **resk-logits integration**: Real-time generation-time shadow ban via [resk-logits](https://github.com/Resk-Security/resk-logits).
+- **Documentation** : https://resk-security.github.io/Resk-LLM/
 
 ## Table of Contents
 
