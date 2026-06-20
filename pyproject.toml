@@ -17,13 +17,12 @@ classifiers = [
     "Topic :: Security",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["pyyaml>=6.0"]
+dependencies = ["pyyaml>=6.0", "resklogits>=0.1.0"]
 
 [project.optional-dependencies]
 fastapi = ["fastapi>=0.100.0", "starlette>=0.27.0"]
 openai = ["openai>=1.0.0"]
-resklogits = ["resklogits>=0.1.0"]
-all = ["resk-llm[fastapi,openai,resklogits]", "types-PyYAML>=6.0"]
+all = ["resk-llm[fastapi,openai]", "types-PyYAML>=6.0"]
 
 [project.scripts]
 resk = "resk2.cli.resk_cli:main"
