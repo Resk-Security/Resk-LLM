@@ -18,7 +18,7 @@ pip install resk-llm
 
 Only hard dependency: `pyyaml`. No ML frameworks required.
 
-## Usage rapide (30 seconds)
+## Use 
 
 ```python
 from resk2 import SecurityPipeline, DirectInjectionDetector, BypassDetector
@@ -41,7 +41,7 @@ from resk2.integrations import ReskMiddleware
 app.add_middleware(ReskMiddleware, pipeline=pipeline, excluded_paths=["/health"])
 ```
 
-## Pourquoi Resk-LLM ?
+## Why Resk-LLM ?
 
 Most LLM security tools inspect prompts with keyword filters or moderate outputs **after** generation — too late. Resk-LLM runs a pipeline of 11 specialized detectors (pattern-based, behavioral, semantic and structural) **at input time**, plus post-generation protection (output validation, canary tokens for leak detection). All rules live in a user-editable `patterns.yaml` — no code changes to tune it.
 
