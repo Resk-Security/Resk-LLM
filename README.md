@@ -4,7 +4,6 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/resk-llm.svg)](https://pypi.org/project/resk-llm/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/resk-llm.svg)](https://pypi.org/project/resk-llm/)
-[![License](https://img.shields.io/pypi/l/resk-llm.svg)](https://github.com/Resk-Security/Resk-LLM/blob/main/LICENSE)
 [![Downloads](https://static.pepy.tech/badge/resk-llm)](https://pepy.tech/project/resk-llm)
 [![GitHub stars](https://img.shields.io/github/stars/Resk-Security/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/Resk-Security/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/issues)
