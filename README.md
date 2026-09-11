@@ -9,6 +9,8 @@
 [![GitHub issues](https://img.shields.io/github/issues/Resk-Security/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/issues)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://resk-security.github.io/Resk-LLM/)
 
+🔗 Part of [RESK Security](https://resk.fr) — tools, blog and docs at [resk.fr](https://resk.fr)
+
 ## Installation
 
 ```bash
