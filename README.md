@@ -9,7 +9,9 @@
 [![GitHub issues](https://img.shields.io/github/issues/Resk-Security/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/issues)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://resk-security.github.io/Resk-LLM/)
 
-🔗 Part of [RESK Security](https://resk.fr) — tools, blog and docs at [resk.fr](https://resk.fr)
+🔗 [resk.fr/projects/resk-llm](https://resk.fr/projects/resk-llm.html) — part of [RESK Security](https://resk.fr)
+
+📚 Guides: [Implementing RESK-LLM in Production](https://resk.fr/blog/implementing-resk-llm.html) · [Understanding & Preventing Prompt Injection Attacks](https://resk.fr/blog/prompt-injection-attacks.html)
 
 ## Installation
 
