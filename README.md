@@ -44,6 +44,31 @@ from resk2.integrations import ReskMiddleware
 app.add_middleware(ReskMiddleware, pipeline=pipeline, excluded_paths=["/health"])
 ```
 
+
+## Migrating from LLM Guard
+
+LLM Guard was archived in July 2026. If you already use its scanner API, the
+compatibility layer keeps the same `scan_prompt` / `scan_output` contract:
+
+```python
+# before
+from llm_guard.input_scanners import PromptInjection
+from llm_guard.output_scanners import Sensitive
+from llm_guard import scan_prompt, scan_output
+
+# after — one import line per scanner
+from resk2.compat.llm_guard import PromptInjection, Sensitive, scan_prompt, scan_output
+
+scanners = [PromptInjection(), Sensitive()]
+sanitized, valid, scores = scan_prompt(scanners, user_prompt)
+clean_output, valid_out, scores_out = scan_output(scanners, user_prompt, model_output)
+```
+
+Available shims: `PromptInjection`, `Jailbreak`, `Sensitive` (PII and
+credential redaction), `BanTopics`, `Toxicity`. Unknown constructor arguments
+are accepted so existing configuration keeps working. The full migration guide
+is at https://resk.fr/blog/llm-guard-alternative-2026.html
+
 ## Why Resk-LLM ?
 
 Most LLM security tools inspect prompts with keyword filters or moderate outputs **after** generation — too late. Resk-LLM runs a pipeline of 11 specialized detectors (pattern-based, behavioral, semantic and structural) **at input time**, plus post-generation protection (output validation, canary tokens for leak detection). All rules live in a user-editable `patterns.yaml` — no code changes to tune it.
