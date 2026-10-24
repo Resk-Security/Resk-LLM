@@ -129,7 +129,7 @@ def _validate_endpoint(
     except socket.gaierror as exc:
         raise ValueError(f"Cannot resolve endpoint host {host}: {exc}") from exc
     for info in infos:
-        raw_ip = info[4][0].split("%", 1)[0]
+        raw_ip = str(info[4][0]).split("%", 1)[0]
         ip = ipaddress.ip_address(str(raw_ip))
         if (
             ip.is_private
