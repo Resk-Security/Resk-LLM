@@ -1,6 +1,6 @@
 [project]
 name = "resk-llm"
-version = "2.1.0"
+version = "2.2.0"
 description = "Comprehensive security toolkit for LLM applications - https://resk.fr"
 readme = "README.md"
 license = "MIT"
