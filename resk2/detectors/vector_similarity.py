@@ -130,7 +130,7 @@ def _validate_endpoint(
         raise ValueError(f"Cannot resolve endpoint host {host}: {exc}") from exc
     for info in infos:
         raw_ip = info[4][0].split("%", 1)[0]
-        ip = ipaddress.ip_address(raw_ip)
+        ip = ipaddress.ip_address(str(raw_ip))
         if (
             ip.is_private
             or ip.is_loopback
