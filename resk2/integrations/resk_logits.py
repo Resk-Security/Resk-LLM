@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from pathlib import Path
+from typing import Any
+
 import yaml
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "patterns.yaml"
@@ -24,7 +26,7 @@ class ReskLogitsIntegration:
 
     def __init__(self, tokenizer=None, config_path: str | Path | None = None):
         self.available = False
-        self._processor = None
+        self._processor: Any | None = None
         self._config_path = config_path
         self._tokenizer = tokenizer
 
