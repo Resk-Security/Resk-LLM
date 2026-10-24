@@ -327,3 +327,29 @@ class TestContentFraming:
         d = ContentFramingDetector()
         r = d.detect("Hello, how are you today?")
         assert r.is_safe is True
+
+
+def test_remote_vector_backend_blocks_ssrf():
+    """RemoteBackend must refuse non-HTTP schemes and private/loopback targets."""
+    import pytest
+    from resk2.detectors.vector_similarity import RemoteBackend
+
+    for endpoint in (
+        "file:///etc/passwd",
+        "http://127.0.0.1:8000",
+        "http://169.254.169.254/latest/meta-data",
+        "http://[::1]:8000",
+    ):
+        with pytest.raises(ValueError):
+            RemoteBackend(endpoint)
+
+    # Explicit opt-in remains possible for operator-controlled internal services.
+    RemoteBackend("http://127.0.0.1:8000", allow_private=True)
+
+
+def test_remote_vector_backend_host_allowlist():
+    import pytest
+    from resk2.detectors.vector_similarity import RemoteBackend
+
+    with pytest.raises(ValueError):
+        RemoteBackend("https://vectors.example.com", allowed_hosts=["other.example.com"])

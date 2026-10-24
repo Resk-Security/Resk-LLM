@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import ipaddress
 import math
 import re
 import json
+import socket
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
-from urllib.request import Request, urlopen
+from typing import Any, Iterable
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import yaml
 
@@ -92,6 +95,53 @@ class LocalTFIDFBackend(VectorBackend):
         return scores[:top_k]
 
 
+class _NoRedirect(HTTPRedirectHandler):
+    """Refuse HTTP redirects so a validated public URL cannot pivot to an internal one."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        return None
+
+
+def _validate_endpoint(
+    endpoint: str,
+    allow_private: bool = False,
+    allowed_hosts: Iterable[str] | None = None,
+) -> None:
+    """Validate a remote vector-DB endpoint against SSRF.
+
+    Raises:
+        ValueError: non-HTTP(S) scheme, missing host, disallowed host, or a
+            hostname resolving to a private/loopback/link-local/reserved IP.
+    """
+    parsed = urlparse(endpoint)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported endpoint scheme: {parsed.scheme!r}")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("Endpoint must include a hostname")
+    if allowed_hosts is not None and host not in set(allowed_hosts):
+        raise ValueError(f"Endpoint host not in allowlist: {host}")
+    if allow_private:
+        return
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise ValueError(f"Cannot resolve endpoint host {host}: {exc}") from exc
+    for info in infos:
+        raw_ip = info[4][0].split("%", 1)[0]
+        ip = ipaddress.ip_address(raw_ip)
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            raise ValueError(f"Refusing to connect to non-public address {ip}")
+
+
 class RemoteBackend(VectorBackend):
     """Generic HTTP backend for remote vector DBs (Pinecone, Qdrant, etc.).
 
@@ -104,10 +154,14 @@ class RemoteBackend(VectorBackend):
         endpoint: str,
         headers: dict | None = None,
         top_k_param: str = "top_k",
+        allow_private: bool = False,
+        allowed_hosts: Iterable[str] | None = None,
     ):
+        _validate_endpoint(endpoint, allow_private=allow_private, allowed_hosts=allowed_hosts)
         self._endpoint = endpoint
         self._headers = headers or {}
         self._top_k_param = top_k_param
+        self._opener = build_opener(_NoRedirect)
 
     def query(self, text: str, top_k: int = 3) -> list[dict[str, Any]]:
         payload = json.dumps({"text": text, self._top_k_param: top_k})
@@ -117,8 +171,11 @@ class RemoteBackend(VectorBackend):
             headers={"Content-Type": "application/json", **self._headers},
             method="POST",
         )
-        with urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
+        try:
+            with self._opener.open(req, timeout=10) as resp:
+                return json.loads(resp.read())
+        except Exception as exc:
+            raise ValueError(f"Remote vector query failed: {exc}") from exc
 
 
 class VectorSimilarityDetector(BaseDetector):
@@ -173,6 +230,8 @@ class VectorSimilarityDetector(BaseDetector):
                 self._backend = RemoteBackend(
                     section.get("endpoint", ""),
                     section.get("headers"),
+                    allow_private=bool(section.get("allow_private", False)),
+                    allowed_hosts=section.get("allowed_hosts"),
                 )
         else:
             self.enabled = True
