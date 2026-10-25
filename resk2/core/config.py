@@ -10,7 +10,7 @@ class SecurityConfig:
     block_on_first_threat: bool = True
     block_categories: list[str] = field(default_factory=lambda: [
         "direct_injection", "bypass_detection", "exfiltration",
-        "memory_poisoning", "inter_agent_injection",
+        "memory_poisoning", "inter_agent_injection", "goal_hijack",
     ])
     min_confidence_threshold: float = 0.3
     severity_weights: dict[str, float] = field(default_factory=lambda: {

@@ -9,6 +9,8 @@
 [![GitHub issues](https://img.shields.io/github/issues/Resk-Security/Resk-LLM.svg)](https://github.com/Resk-Security/Resk-LLM/issues)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://resk-security.github.io/Resk-LLM/)
 
+[![Documentation](https://img.shields.io/badge/docs-resk.fr%2Fdocs%2Fresk-llm-orange)](https://resk.fr/docs/resk-llm/)
+
 🔗 [resk.fr/projects/resk-llm](https://resk.fr/projects/resk-llm.html) — part of [RESK Security](https://resk.fr)
 
 📚 Guides: [Implementing RESK-LLM in Production](https://resk.fr/blog/implementing-resk-llm.html) · [Understanding & Preventing Prompt Injection Attacks](https://resk.fr/blog/prompt-injection-attacks.html)
@@ -19,7 +21,14 @@
 pip install resk-llm
 ```
 
-Only hard dependency: `pyyaml`. No ML frameworks required.
+Base install depends only on `pyyaml` — no ML framework. The optional
+decoding-time bridge is installed separately:
+
+```bash
+pip install "resk-llm[logits]"   # resklogits (torch + transformers)
+pip install "resk-llm[openai]"   # OpenAI wrapper
+pip install "resk-llm[fastapi]"  # FastAPI/Starlette middleware
+```
 
 ## Use 
 
@@ -76,7 +85,7 @@ Most LLM security tools inspect prompts with keyword filters or moderate outputs
 | | **Resk-LLM** | LLM Guard | NeMo Guardrails | Guardrails AI |
 |---|---|---|---|---|
 | Focus | LLM attack detection + PII/canary defense | Input/output scanners | Dialog flows & rails | Output schema validation |
-| Attack-specific detectors (injection, memory poisoning, goal hijack, exfiltration, inter-agent) | ✅ 11 dedicated | Generic scanner classes | ⚠️ via rail configs | ❌ |
+| Attack-specific detectors (injection, memory poisoning, goal hijack, exfiltration, inter-agent) | ✅ 9 dedicated | Generic scanner classes | ⚠️ via rail configs | ❌ |
 | Rules editable without code | ✅ `patterns.yaml` | Python config | Colang | Pydantic models |
 | Heavy dependencies | ✅ `pyyaml` only | Multiple ML deps | Nemoxcore stack | Varies |
 | Multi-turn escalation tracking | ✅ `ConversationContext` | ❌ | ⚠️ | ❌ |
