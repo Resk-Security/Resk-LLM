@@ -1,6 +1,6 @@
 """RESK-LLM v2.2 - Comprehensive security toolkit for LLM applications."""
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"
 
 # Core
 from .core.detector import DetectionResult, Severity, ThreatCategory, BaseDetector

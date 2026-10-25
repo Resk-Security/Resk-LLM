@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.1] - 2026-10-25
+
+### Fixed
+- `goal_hijack` is now part of the default `block_categories`: the detector
+  reported the threat but never blocked it unless the caller opted in.
+- Importing `resk2.integrations` no longer requires Starlette; the OpenAI
+  wrapper can be used with only the `[openai]` extra.
+
+### Changed
+- `resklogits` moved to the optional `[logits]` extra (included in `[all]`).
+  The base install depends only on `pyyaml` on every Python version, so
+  PyTorch/Transformers are no longer pulled in implicitly on 3.11+.
+- License metadata aligned with `LICENSE.txt`: Apache-2.0 (was declared MIT).
+
 ## [2.2.0] - 2026-10-24
 
 ### Added
